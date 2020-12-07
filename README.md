@@ -177,58 +177,327 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
 
 ## Day-1 Activities
 
-- ### **Folder Structure** - 
+- ### **Referene** - 
+  - Github repo link containing files needed to an ARO setup - https://github.com/monojit18/AROAutomate.git
+  - Azure CLI approach is described here; but a more automated approach like *Terraform* Or *ARM Template* is preferred
 
-  - **Deployments**
+- ### Prerequisites -
 
-    - 
+  - Select a suitable machine for initial setting up of the cluster - *Windows* or *Linux*. Refer to the Bastion Host setup described above in *Day-0* section
+  - Private clusters would block all ARO API server access over public network; hence both CLI as well as Web Console would be blocked to access, view, manage cluster resources. If the plan is to create a *Private Cluster* then a designated machine is imperative for day-to-day operation of the cluster
+  - Installation of Tools/Softwares
+    - **Docker** - 
+      - Windows - https://docs.docker.com/docker-for-windows/install/
+      - Linux - https://runnable.com/docker/install-docker-on-linux
+    - **Kubectl** - 
+      - Windows - https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-kubectl-binary-with-curl-on-windows
+      - Linux - https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-kubectl-on-linux
+    - **Azure CLI** -
+      - Windows - https://docs.microsoft.com/en-us/cli/azure/install-azure-cli-windows?tabs=azure-cli
+      - Linux - https://docs.microsoft.com/en-us/cli/azure/install-azure-cli-apt#install
+    - **Helm** -
+      - Windows and Linux - https://helm.sh/docs/intro/install/
+    - **Git** - 
+      - Windows - https://git-scm.com/download/win
+      - Linux - https://git-scm.com/book/en/v2/Getting-Started-Installing-Git
+    - **GitHub Desktop** (*Windows only*) -
+      - Windows - https://desktop.github.com/
+    - **PowerShell Core** -
+      - Windows and Linux - 
+        - https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell?view=powershell-7.1
+    - **VS Code IDE** -
+      - Windows - https://code.visualstudio.com/
 
+- Login to the Azure account
 
-  
+  ```bash
+  az login
+  ```
 
-  ## Day-2 Activities
+- Set appropriate Account  (*for multiple subscriptions*)
 
-  ### Cluster Hardening
-
-  (*Associted Roles* -  **Architects, Managers, Developers(?)**)
-
-  - **Network Policy** (*East-West Traffic*)
-
-    1. NetPol folder under YAMLs folder (above) would contain sample Network Policy file.This can be modified crested more specific policies
-
-    2. Define Ingress policy for each micro service (aka tyoe of PODs)
-
-    3. Define Egress policy for each micro service (aka tyoe of PODs)
-
-    4. Include any socaial IPs to be allowed
-
-    5. Exclude any IPs to Disallowed
-
-       
-
-  - **Secrets**
-
-    - Create All Secrets needed by the micro services
-
-    - Majorly Docker Secrets, Storage Secrets, DB Secrets etc.
-
-      
-
-  - **Azure Policy**
-
-    1. Go to Azure Portal and Select Policy
-    2. Filter by Kubernetes keyworkd
-    3. Add All relevant built-in policies on the cluster
-
-  
+  ```bash
+  az account set -s <subscription_id>
+  ```
 
   
 
-  
+- Register various Providers with Azure CLI
+
+  ```bash
+  az provider register -n Microsoft.RedHatOpenShift --wait
+  az provider register -n Microsoft.Compute --wait
+  az provider register -n Microsoft.Storage --wait
+  ```
 
   
 
+- Run the following command to install the ARO extension for Azure CLI
+
+  ```bash
+  az extension add -n aro --index https://az.aroapp.io/stable
+  ```
+
   
+
+- If you already have the extension installed, you can update by running the following command
+
+  ```bash
+  az extension update -n aro --index https://az.aroapp.io/stable
+  ```
+
+  
+
+- Get a Red Hat pull secret (*Optional*)
+
+  - This is needed for accessing the in-built template and repositories tat comes as a bundle with OpenShift runtime
+  - This would help installing most common services like various Databases, Web Servers, Test Frameworks etc. on the ARO cluster easily through certified, secured images provided by OpenShift
+  - This is *Optional* but <u>*Recommended*</u>
+
+  ```bash
+  Register or Login at - https://cloud.redhat.com/openshift/install/azure/aro-provisioned
+  ```
+
+  
+
+- Define few CLI variables; this would facilitate the running of subsequent commands
+
+  ```bash
+  $resourceGroup = "<place_holder>"
+  $vnetName = "<place_holder>"
+  $vnetIPAddress = "<place_holder>"
+  $workerSubnetName = "<place_holder>"
+  $workerIPAddress = "<place_holder>"
+  $masterSubnetName = "<place_holder>"
+  $masterIPAddress = "<place_holder>"
+  $servicePrincipalName = "<place_holder>"
+  $location = "<place_holder>"
+  $clusterName = "<place_holder>"
+  $workerCount = 4 # change accordingly <num>
+  $clusterType = "Public" # Public/Private
+  ```
+
+  
+
+- Create a virtual network referred as *ARO+ VNET* in the above *Day-0* section
+
+  ```bash
+  az network vnet create \
+  --resource-group $resourceGroup \
+  --name $vnetName \
+  --address-prefixes $vnetIPAddress/20
+  ```
+
+  
+
+- Add an empty subnet for the master nodes
+
+  ```bash
+  az network vnet subnet create \
+  --name  $workerSubnetName \
+  --resource-group $resourceGroup \
+  --vnet-name $vnetName \
+  --address-prefixes $workerIPAddress/21 \
+  --service-endpoints Microsoft.ContainerRegistry
+  ```
+
+  
+
+- Add an empty subnet for the worker nodes
+
+  ```bash
+  az network vnet subnet create \
+  --name $masterSubnetName \
+  --resource-group $resourceGroup \
+  --vnet-name $vnetName \
+  --address-prefixes $masterIPAddress/24 \
+  --service-endpoints Microsoft.ContainerRegistry
+  ```
+
+  
+
+- Disable subnet private endpoint policies
+
+  ```bash
+  az network vnet subnet update \
+  --name $masterSubnetName \
+  --resource-group $resourceGroup \
+  --vnet-name $vnetName \
+  --disable-private-link-service-network-policies true
+  ```
+
+  
+
+- Create Service Principal for ARO cluster
+
+  ```bash
+  az ad sp create-for-rbac --role Contributor -n $servicePrincipalName
+  # Note down the response
+  {
+    "appId": "<client_id>",
+    "displayName": "<display_name>",
+    "name": "http://<display_name>",
+    "password": "<client_secret>",
+    "tenant": "<tenant_id>"
+  }
+  ```
+
+  
+
+- Create the ARO Cluster (Public/Private)
+
+  ```bash
+  az aro create \
+    --resource-group $resourceGroup \
+    --location $location \
+    --name $clusterName \
+    --vnet $vnetName \
+    --master-subnet $masterSubnetName \
+    --worker-subnet $workerSubnetName \
+    --apiserver-visibility $clusterType \
+    --ingress-visibility $clusterType \
+    --worker-count $workerCount \
+    --client-id "<client_id>" \
+    --client-secret "<client_secret>" \
+    --pull-secret @"/path/to/pull-secret.txt"
+  ```
+
+  
+
+- ARO cluster details
+
+  - These info would be needed while managing the cluster
+
+  ```bash
+  creds=$(az aro list-credentials -n $clusterName -g $resourceGroup)
+  domain=$(az aro show -n $clusterName -g $resourceGroup --query clusterProfile.domain -o tsv)
+  location=$(az aro show -n $clusterName -g $resourceGroup --query location -o tsv)
+  apiServer=$(az aro show -n $clusterName -g $resourceGroup --query apiserverProfile.url -o tsv)
+  webConsole=$(az aro show -n $clusterName -g $resourceGroup --query consoleProfile.url -o tsv)
+  
+  echo $creds
+  {
+      "kubeadminusername": <user_name>,
+      "kubeadminpassword": <password>
+  
+  }
+  ```
+
+  
+
+- Issuer URL - 
+
+  - This is to be used during Azure AD integration
+
+  ```bash
+  oauthCallbackURL=https://oauth-openshift.apps.$domain.$location.aroapp.io/oauth2callback/AAD
+  ```
+
+  
+
+- kube:admin login - a temporary cluster admin
+
+  ```bash
+  oc login $apiServer -u <user_name> -p <password>
+  ```
+
+  
+
+- Configure Azure AD for RBAC
+
+  - Refer this link for step-by-step guide - https://docs.microsoft.com/en-us/azure/openshift/configure-azure-ad-ui
+
+  ```bash
+  # Ask each user to login with AAD credentials as described in the above link
+  # kube:admin user would see all users as they login from their respective console(s) for the first time
+  
+  # Goto User Management -> Groups in Web console
+  # Create Groups using web console with these users - at least 3 (recommended) - clusteradmins, architects, developers
+  ```
+
+  
+
+- RBAC
+
+  ```bash
+  # Refer to RBAC folder in source
+  
+  # Deploy Cluster Admins
+  oc apply -f "path/to/cluster_admin_rbac_file_name" (specify group name as clusteradmins)
+  
+  # Deploy Cluster Managers
+  oc apply -f "path/to/cluster_managers_rbac_file_name" (specify group name as architects)
+  
+  # Deploy Developers
+  oc apply -f "path/to/developers_rbac_file_name" (specify group name as developers)
+  
+  # Someone from clusteradmins group can now login using AAD credentials
+  # Perform all subsequent cluster configurations
+  ```
+
+  
+
+- Network Policy
+
+  ```bash
+  # Decide on the communication within cluster
+  
+  # Refer to Netpol folder in source
+  
+  # Define Ingress and Egress of each Pod, Namespace with aprropriate access (specific to application needs)
+  
+  # Deploy a sample network policy for reference
+  oc apply -f "path/to/netpol_file_name"
+  
+  # Define Egress Firewall Network Policy
+  # This is to make sure what external links the Pods within the cluster can access
+  # Deploy a sample Egress network policy for reference
+  oc apply -f "path/to/egress_netpol_file_name"
+  
+  ```
+
+  
+
+
+
+## Day-2 Activities
+
+### Cluster Hardening
+
+(*Associted Roles* -  **Architects, Managers, Developers(?)**)
+
+- **Network Policy** (*East-West Traffic*)
+
+  1. NetPol folder under YAMLs folder (above) would contain sample Network Policy file.This can be modified crested more specific policies
+
+  2. Define Ingress policy for each micro service (aka tyoe of PODs)
+
+  3. Define Egress policy for each micro service (aka tyoe of PODs)
+
+  4. Include any socaial IPs to be allowed
+
+  5. Exclude any IPs to Disallowed
+
+     
+
+- **Secrets**
+
+  - Create All Secrets needed by the micro services
+
+  - Majorly Docker Secrets, Storage Secrets, DB Secrets etc.
+
+    
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -1,21 +1,46 @@
-// Login to the Azure account
+#Prerequisites
+#Installation of Tools/Softwares
+
+- **Docker** - 
+  - Windows - https://docs.docker.com/docker-for-windows/install/
+  - Linux - https://runnable.com/docker/install-docker-on-linux
+- **Kubectl** - 
+  - Windows - https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-kubectl-binary-with-curl-on-windows
+  - Linux - https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-kubectl-on-linux
+- **Azure CLI** -
+  - Windows - https://docs.microsoft.com/en-us/cli/azure/install-azure-cli-windows?tabs=azure-cli
+  - Linux - https://docs.microsoft.com/en-us/cli/azure/install-azure-cli-apt#install
+- **Helm** -
+  - Windows and Linux - https://helm.sh/docs/intro/install/
+- **Git** - 
+  - Windows - https://git-scm.com/download/win
+  - Linux - https://git-scm.com/book/en/v2/Getting-Started-Installing-Git
+- **GitHub Desktop** (*Windows only*) -
+  - Windows - https://desktop.github.com/
+- **PowerShell Core** -
+  - Windows and Linux - 
+    - https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell?view=powershell-7.1
+- **VS Code IDE** -
+  - Windows - https://code.visualstudio.com/
+
+#Login to the Azure account
 az login
 
-// Account set (for multple subscriptions)
+#Account set (for multiple subscriptions)
 az account set -s <subscription_id>
 
-// Register Provider
+#Register Provider
 az provider register -n Microsoft.RedHatOpenShift --wait
 az provider register -n Microsoft.Compute --wait
 az provider register -n Microsoft.Storage --wait
 
-// Run the following command to install the az aro extension
+#Run the following command to install the az aro extension
 az extension add -n aro --index https://az.aroapp.io/stable
 
-// If you already have the extension installed, you can update by running the following command.
+#If you already have the extension installed, you can update by running the following command.
 az extension update -n aro --index https://az.aroapp.io/stable
 
-// Get a Red Hat pull secret (optional)
+#Get a Red Hat pull secret (optional)
 https://cloud.redhat.com/openshift/install/azure/aro-provisioned (Register or Login)
 
 $resourceGroup = "<place_holder>"
@@ -28,17 +53,17 @@ $masterIPAddress = "<place_holder>"
 $servicePrincipalName = "<place_holder>"
 $location = "<place_holder>"
 $clusterName = "<place_holder>"
-$workerCount = 4 // change accordingly <num>
-$clusterType = "Public" // Public/Private
+$workerCount = 4 #change accordingly <num>
+$clusterType = "Public" #Public/Private
 
 
-// Create a virtual network containing two empty subnets -
+#Create a virtual network containing two empty subnets -
 az network vnet create \
 --resource-group $resourceGroup \
 --name $vnetName \
 --address-prefixes $vnetIPAddress/20
 
-// Add an empty subnet for the master nodes -
+#Add an empty subnet for the master nodes -
 az network vnet subnet create \
 --name  $workerSubnetName \
 --resource-group $resourceGroup \
@@ -46,7 +71,7 @@ az network vnet subnet create \
 --address-prefixes $workerIPAddress/21 \
 --service-endpoints Microsoft.ContainerRegistry
 
-// Add an empty subnet for the worker nodes -
+#Add an empty subnet for the worker nodes -
 az network vnet subnet create \
 --name $masterSubnetName \
 --resource-group $resourceGroup \
@@ -54,16 +79,16 @@ az network vnet subnet create \
 --address-prefixes $masterIPAddress/24 \
 --service-endpoints Microsoft.ContainerRegistry
 
-// Disable subnet private endpoint policies  -
+#Disable subnet private endpoint policies  -
 az network vnet subnet update \
 --name $masterSubnetName \
 --resource-group $resourceGroup \
 --vnet-name $vnetName \
 --disable-private-link-service-network-policies true
 
-// Create Service Principal for ARO cluster
+#Create Service Principal for ARO cluster
 az ad sp create-for-rbac --role Contributor -n $servicePrincipalName
-// Note down the response
+#Note down the response
 {
   "appId": "<client_id>",
   "displayName": "<display_name>",
@@ -72,7 +97,7 @@ az ad sp create-for-rbac --role Contributor -n $servicePrincipalName
   "tenant": "<tenant_id>"
 }
 
-// Create the ARO Cluster (Public/Private) -
+#Create the ARO Cluster (Public/Private) -
 az aro create \
   --resource-group $resourceGroup \
   --location $location \
@@ -87,10 +112,10 @@ az aro create \
   --client-secret "<client_secret>" \
   --pull-secret @"/path/to/pull-secret.txt"
 
-// Delete a cluster
+#Delete a cluster
 az aro delete -n aro-workshop-cluster -g aro-workshop-rg -y
 
-// ARO cluster details
+#ARO cluster details
 creds=$(az aro list-credentials -n $clusterName -g $resourceGroup)
 domain=$(az aro show -n $clusterName -g $resourceGroup --query clusterProfile.domain -o tsv)
 location=$(az aro show -n $clusterName -g $resourceGroup --query location -o tsv)
@@ -108,82 +133,82 @@ echo $creds
 //kube:admin login - a temporary cluster admin
 oc login $apiServer -u <user_name> -p <password>
 
-// Configure Azure AD for RBAC
+#Configure Azure AD for RBAC
 https://docs.microsoft.com/en-us/azure/openshift/configure-azure-ad-ui
 
-// Ask each user to login with AAD credentials as described in the above link
-// kube:admin user would see all users as they login from their respective console(s) for the first time
+#Ask each user to login with AAD credentials as described in the above link
+#kube:admin user would see all users as they login from their respective console(s) for the first time
 
-// Goto User Management -> Groups in Web console
-// Create Groups using web console with these users - at least 3 (recommended) - clusteradmins, architects, developers
+#Goto User Management -> Groups in Web console
+#Create Groups using web console with these users - at least 3 (recommended) - clusteradmins, architects, developers
 
-// RBAC
-// Deploy Cluster Admins
+#RBAC
+#Deploy Cluster Admins
 oc apply -f "path/to/cluster_admin_rbac_file_name" (specify group name as clusteradmins)
 
-// Deploy Cluster Managers
+#Deploy Cluster Managers
 oc apply -f "path/to/cluster_managers_rbac_file_name" (specify group name as architects)
 
-// Deploy Developers
+#Deploy Developers
 oc apply -f "path/to/developers_rbac_file_name" (specify group name as developers)
 
-// Someone from clusteradmins group can now login using AAD credentials
-// Perform all subsequent cluster configurations
+#Someone from clusteradmins group can now login using AAD credentials
+#Perform all subsequent cluster configurations
 
-// Install Nginx Ingress controller - with Internal Load Balancer
+#Install Nginx Ingress controller - with Internal Load Balancer
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 
-// Install Nginx Ingress controller as Private (ILB) or Public
+#Install Nginx Ingress controller as Private (ILB) or Public
 
-// For Public, comment out the following section from config file
+#For Public, comment out the following section from config file
 /* service:
     loadBalancerIP: <place_holder> #private IP */
 
 helm install nginx-ingress ingress-nginx/ingress-nginx --namespace kube-system -f "path/to/ingress_config_file_name"
 
-// If Nginx Ingress controller is installed as Public LB
-// The flow then would be - 
-// Nginx Ingress Controller (Public IP) -> Kubernetes Ingress -> Backend APIs
+#If Nginx Ingress controller is installed as Public LB
+#The flow then would be - 
+#Nginx Ingress Controller (Public IP) -> Kubernetes Ingress -> Backend APIs
 
-// If Nginx Ingress controller is installed as Private LB then another External LB is needed
-// to communicate with Nginx Ingress and then subsequently to the APIs in ARO cluster
-// e.g. Application Gateway
-// The flow then would be - 
-// App G/W -> Nginx Ingress Controller (Private IP) -> Kubernetes Ingress -> Backend APIs
+#If Nginx Ingress controller is installed as Private LB then another External LB is needed
+#to communicate with Nginx Ingress and then subsequently to the APIs in ARO cluster
+#e.g. Application Gateway
+#The flow then would be - 
+#App G/W -> Nginx Ingress Controller (Private IP) -> Kubernetes Ingress -> Backend APIs
 
-// uninstall nginx ingress controller
+#uninstall nginx ingress controller
 helm uninstall nginx-ingress -n kube-system
 
-// Deploy an Ingress object
+#Deploy an Ingress object
 oc apply -f "path/to/ingress_file_name"
 
 $projectName = "<place_holder>" (Sme as namespace in k8s)
-// Create Projects/Namespaces - Dev, QA, Staging
+#Create Projects/Namespaces - Dev, QA, Staging
 
-// Deploy nginx (for testing and health probe)
+#Deploy nginx (for testing and health probe)
 oc new-project $projectName
 
 oc process openshift//mongodb-persistent -p MONGODB_USER=ratingsuser -p MONGODB_PASSWORD=ratingspassword -p MONGODB_DATABASE=ratingsdb -p MONGODB_ADMIN_PASSWORD=ratingspassword | oc create -f -
 
 oc new-app https://github.com/monojit18/RatingsWebARO/ --context-dir=/RatingsWeb/Source
-// Go to Deployments
-// Select ratingswebaro deployment entry
-// Select Environments -> Add an entry
+#Go to Deployments
+#Select ratingswebaro deployment entry
+#Select Environments -> Add an entry
 API = http://ratingsapiaro.aro-workshop-dev.svc.cluster.local
 
 oc new-app https://github.com/monojit18/RatingsApiARO/ --context-dir=/RatingsApi/Source
-// Go to Deployments
-// Select ratingsapiaro deployment entry
-// Select Environments -> Add an entry
+#Go to Deployments
+#Select ratingsapiaro deployment entry
+#Select Environments -> Add an entry
 MONGODB_URI = mongodb://ratingsuser:ratingspassword@mongodb:27017/ratingsdb
 
-// Test the flow using Routes
+#Test the flow using Routes
 oc expose svc/ratingswebaro
-// Go to Web console
-// Select Routes
-// Select the newly generated route and test the app flow
+#Go to Web console
+#Select Routes
+#Select the newly generated route and test the app flow
 
-// Hands-on-workshop
+#Hands-on-workshop
 https://aroworkshop.io/
 
 
