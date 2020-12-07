@@ -71,61 +71,86 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
 
       - **ARO subnet** - A completely dedicated Subnet for ARO cluster. No other resources to be planned on this. 
 
-        **<u>/21, 22</u>** for Dev/UAT and **<u>/18, /20</u>** for Prod id safe to choose. *If Address space is an issue then Kubenet*. This should be a dedicated subnet for AKS cluster.
+        **<u>/21, 22</u>** for Dev/UAT and **<u>/18, /20</u>** for Prod id safe to choose. *If Address space is an issue then Kubenet*. This should be a dedicated subnet for ARO cluster.
 
         The question that should debated at this stage are -
 
         - How many micro-services approximately to be deployed (*now* and *in future*)
+    
         - What would the minimum and maximum no. of replicas for each
+    
         - How much *CPU* and *Memory* that each micro-services could consume approximately
+    
         - And based on all these –
-          - What is Size of each *Node* (VM) i.e how many *Cores of CPU* and how much *GB of Runtime Memory*
+      - What is Size of each *Node* (VM) i.e how many *Cores of CPU* and how much *GB of Runtime Memory*
           - how many *Nodes* (VMs) that the cluster could expect (*initially and when scaled up?*) – basically *minimum* and *maximum* no. of such *Nodes*
-        - Finally *maximum* number of pods or app replicas you want in each *Node* – Ideally whatever be the size of the *Node*, this value should not go beyond 40-50; not an hard and fast rule but with standard VM sizes like 8 Core 16 GB, 40-50 *Pods* per *Node* is good enough Based on all these info, let us try to define a formulae to decide what would be the address space of VNET and Subnet for AKS.
+      
+        - Finally *maximum* number of pods or app replicas you want in each *Node* – Ideally whatever be the size of the *Node*, this value should not go beyond 40-50; not an hard and fast rule but with standard VM sizes like 8 Core 16 GB, 40-50 *Pods* per *Node* is good enough Based on all these info, let us try to define a formulae to decide what would be the address space of VNET and Subnet for ARO.
 
-        Let us assume,
+          Let us assume,
 
-        **Np** = Max. Number of Pods in each Node (Ideally should not be more ethan 40-50)
+          **Np** = Max. Number of Pods in each Node (Ideally should not be more ethan 40-50)
 
-        **Nd** = Max. Number of Nodes possible (approx.)
+          **Nd** = Max. Number of Nodes possible (approx.)
 
-        Then the total no. of addresses that you would need in AKS Subnet = ***(Np \* (Nd + 1) + Np)\***
+          Then the total no. of addresses that you would need in ARO Subnet = ***(Np \* (Nd + 1) + Np)\***
 
-        *+1 for reserved IP by system for each Node*
+          *+1 for reserved IP by system for each Node*
 
-        *+Np for additional IPs you might need while Upgrade* – normally K8s system will pull down one Node at a time, transfer all workloads to another Node and then upgrade the previous Node
+          *+Np for additional IPs you might need while Upgrade* – normally K8s system will pull down one Node at a time, transfer all workloads to another Node and then upgrade the previous Node
 
-        It is advisable to keep some more in buffer based on workloads and other unforeseen situations
+          It is advisable to keep some more in buffer based on workloads and other unforeseen situations
 
-        What we have seen, for high end workloads, ideally for a *DEV-UAT* cluster, we should go with **/21 or /22** which means around 2k or 1k *Nodes*.
+          What we have seen, for high end workloads, ideally for a *DEV-UAT* cluster, we should go with **/21 or /22** which means around 2k or 1k *Nodes*.
 
-        *PROD* cluster should have a bit more like **/18 or /20** which means around 16k or 4k *Nodes*
+          *PROD* cluster should have a bit more like **/18 or /20** which means around 16k or 4k *Nodes*
 
-      - **APIM subnet** (*Optional*) - One dedicated subnet for APIM. Two options are there - External VNET or Internal VNET.
+        - Please note that for ARO cluster - 
 
+          - Minimum 3 Master Nodes and 3 Worker Nodes are needed
+      - Master Nodes are to sized at minimum Standard D8s v3 *(8 vcpus, 32 GiB memory)*
+          - Worker Nodes are sized at minimum Standard D4s v3 *(4 vcpus, 16 GiB memory)*
+    
+    
+    
+  - **APIM subnet** (*Optional*) - One dedicated subnet for APIM. Two options are there - External VNET or Internal VNET.
+    
         In case of *Internal* - the endpoint is completely private.
-
+    
         In cade of *External* - the ingress to VNET is allowed by default and hence a proper NSG has to be added to control ingress access only from *Application Gateway*
-
+    
         The address
-
-        - *Same VNET or Separate VNET*? If one APIM across entire org then should be in a separate VNET and then peering with AKS VNET
-        - *Address Space* - **/29** is enough for both DEV and PROD
-
+    
+    - *Same VNET or Separate VNET*? If one APIM across entire org then should be in a separate VNET and then peering with ARO VNET
+        
+    - *Address Space* - **/29** is enough for both DEV and PROD
+        
+      
+    
     - **Integration Services VNET** - Provide Private endpoint for these all integration services peered with *ARO VNET* viz.
-
+    
       - *Azure Container Registry aka ACR*
+    
       - *Azure KeyVault*
+    
       - *Storage*
+    
       - *Azure SQL DB*
+    
       - *Azure Redis Cache*
+    
       - *Cosmos DB*
+    
       - *Azure Service Bus*
-
+    
+        
+    
     - **DevOps VNET** - *Self-hosted* DevOps agents - *Linux* or *Windows*; peered with *ARO VNET*
-
+    
+      
+    
     - **NSGs to be decided Upfront**
-
+    
       - Decide basic NSGs for all the subnets
       - Some important *Inbound* rules to be followed -
         - App G/W allows communication only from Azure Front door
@@ -135,7 +160,7 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
         - ARO Subnet outbound would always use the public *Standard LoadBalancer* created during Cluster creatiopn process. To change that behaviour - add appripriate outbound rules and anyone of the following
           - Nat Gateway associated with ARO subnet
           - UDR through a Firewall Subnet
-          - Forcing communication directly through web corporate proxy - this needs some amount scripting. Setting *http_proxy* or *https_proxy* can be deployed as a *Daemonset* on every AKS cluster node and force Nodes to send raffic through proxy
+          - Forcing communication directly through web corporate proxy - this needs some amount scripting. Setting *http_proxy* or *https_proxy* can be deployed as a *Daemonset* on every ARO cluster node and force Nodes to send raffic through proxy
 
 ### Plan Communication to Azure Services
 
