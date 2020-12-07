@@ -177,6 +177,8 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
 
 ## Day-1 Activities
 
+### Execution and Hardening Phase
+
 - ### **Referene** - 
   - Github repo link containing files needed to an ARO setup - https://github.com/monojit18/AROAutomate.git
   - Azure CLI approach is described here; but a more automated approach like *Terraform* Or *ARM Template* is preferred
@@ -208,13 +210,13 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
     - **VS Code IDE** -
       - Windows - https://code.visualstudio.com/
 
-- Login to the Azure account
+- **Login to the Azure account**
 
   ```bash
   az login
   ```
 
-- Set appropriate Account  (*for multiple subscriptions*)
+- **Set appropriate Account  (*for multiple subscriptions*)**
 
   ```bash
   az account set -s <subscription_id>
@@ -222,7 +224,7 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
 
   
 
-- Register various Providers with Azure CLI
+- **Register various Providers with Azure CLI**
 
   ```bash
   az provider register -n Microsoft.RedHatOpenShift --wait
@@ -232,7 +234,7 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
 
   
 
-- Run the following command to install the ARO extension for Azure CLI
+- **Run the following command to install the ARO extension for Azure CLI**
 
   ```bash
   az extension add -n aro --index https://az.aroapp.io/stable
@@ -240,7 +242,7 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
 
   
 
-- If you already have the extension installed, you can update by running the following command
+- **If you already have the extension installed, you can update by running the following command**
 
   ```bash
   az extension update -n aro --index https://az.aroapp.io/stable
@@ -248,7 +250,7 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
 
   
 
-- Get a Red Hat pull secret (*Optional*)
+- **Get a Red Hat pull secret (*Optional*)**
 
   - This is needed for accessing the in-built template and repositories tat comes as a bundle with OpenShift runtime
   - This would help installing most common services like various Databases, Web Servers, Test Frameworks etc. on the ARO cluster easily through certified, secured images provided by OpenShift
@@ -260,7 +262,7 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
 
   
 
-- Define few CLI variables; this would facilitate the running of subsequent commands
+- **Define few CLI variables; this would facilitate the running of subsequent commands**
 
   ```bash
   $resourceGroup = "<place_holder>"
@@ -279,7 +281,7 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
 
   
 
-- Create a virtual network referred as *ARO+ VNET* in the above *Day-0* section
+- **Create a virtual network referred as *ARO+ VNET* in the above *Day-0* section**
 
   ```bash
   az network vnet create \
@@ -290,7 +292,7 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
 
   
 
-- Add an empty subnet for the master nodes
+- **Add an empty subnet for the master nodes**
 
   ```bash
   az network vnet subnet create \
@@ -303,7 +305,7 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
 
   
 
-- Add an empty subnet for the worker nodes
+- **Add an empty subnet for the worker nodes**
 
   ```bash
   az network vnet subnet create \
@@ -316,7 +318,7 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
 
   
 
-- Disable subnet private endpoint policies
+- **Disable subnet private endpoint policies**
 
   ```bash
   az network vnet subnet update \
@@ -328,7 +330,7 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
 
   
 
-- Create Service Principal for ARO cluster
+- **Create Service Principal for ARO cluster**
 
   ```bash
   az ad sp create-for-rbac --role Contributor -n $servicePrincipalName
@@ -344,7 +346,7 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
 
   
 
-- Create the ARO Cluster (Public/Private)
+- **Create the ARO Cluster (Public/Private)**
 
   ```bash
   az aro create \
@@ -364,7 +366,7 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
 
   
 
-- ARO cluster details
+- **ARO cluster details**
 
   - These info would be needed while managing the cluster
 
@@ -385,7 +387,7 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
 
   
 
-- Issuer URL - 
+- **Issuer URL -** 
 
   - This is to be used during Azure AD integration
 
@@ -395,7 +397,7 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
 
   
 
-- kube:admin login - a temporary cluster admin
+- **kube:admin login - a temporary cluster admin**
 
   ```bash
   oc login $apiServer -u <user_name> -p <password>
@@ -403,7 +405,7 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
 
   
 
-- Configure Azure AD for RBAC
+- **Configure Azure AD for RBAC**
 
   - Refer this link for step-by-step guide - https://docs.microsoft.com/en-us/azure/openshift/configure-azure-ad-ui
 
@@ -417,7 +419,7 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
 
   
 
-- RBAC
+- **RBAC**
 
   ```bash
   # Refer to RBAC folder in source
@@ -437,7 +439,21 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
 
   
 
-- Network Policy
+- **Network Policy (*East-West Traffic*)**
+
+  1. NetPol folder in source repo would contain sample *Network Policy* file.This can be modified to create more specific policies
+
+  2. Define Ingress policy for each micro service (aka tyoe of PODs)
+
+  3. Define Egress policy for each micro service (aka tyoe of PODs)
+
+  4. Include any socaial IPs to be allowed
+
+  5. Exclude any IPs to Disallowed
+
+  6. Define Egress Firewall Network policy to restrict Pods accessing external links
+
+     
 
   ```bash
   # Decide on the communication within cluster
@@ -456,38 +472,119 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
   
   ```
 
-  
+- **Secrets**
+
+  - Create All Secrets needed by the micro services
+  - Majorly Docker Secrets, Storage Secrets, DB Secrets etc.
+  - This can be done using oc command line Or through Web Console
 
 
 
 ## Day-2 Activities
 
-### Cluster Hardening
+### Deployment Phase
 
-(*Associted Roles* -  **Architects, Managers, Developers(?)**)
+- **Nginx Ingress Controller**
 
-- **Network Policy** (*East-West Traffic*)
+  - This can be installed as a Private (ILB) or Public LB
 
-  1. NetPol folder under YAMLs folder (above) would contain sample Network Policy file.This can be modified crested more specific policies
-
-  2. Define Ingress policy for each micro service (aka tyoe of PODs)
-
-  3. Define Egress policy for each micro service (aka tyoe of PODs)
-
-  4. Include any socaial IPs to be allowed
-
-  5. Exclude any IPs to Disallowed
-
-     
-
-- **Secrets**
-
-  - Create All Secrets needed by the micro services
-
-  - Majorly Docker Secrets, Storage Secrets, DB Secrets etc.
-
+    ```bash
+    # Refer to Ingress folder in source repo
     
+    # For Public, comment out the following section from config file
+    /* service:
+        loadBalancerIP: <place_holder> #private IP */
+    
+    helm install nginx-ingress ingress-nginx/ingress-nginx --namespace kube-system -f "path/to/ingress_config_file_name"
+    
+    helm install nginx-ingress ingress-nginx/ingress-nginx --namespace kube-system -f "path/to/ingress_config_file_name"
+    
+    # If Nginx Ingress controller is installed as Public LB
+    # The flow then would be - 
+    # Nginx Ingress Controller (Public IP) -> Kubernetes Ingress -> Backend APIs
+    
+    # If Nginx Ingress controller is installed as Private LB then another External LB is needed
+    # to communicate with Nginx Ingress and then subsequently to the APIs in ARO cluster
+    # e.g. Application Gateway
+    # The flow then would be - 
+    # App G/W -> Nginx Ingress Controller (Private IP) -> Kubernetes Ingress -> Backend APIs
+    
+    # uninstall nginx ingress controller
+    helm uninstall nginx-ingress -n kube-system
+    ```
 
+  - Deploy an Ingress object
+
+    ```bash
+    # Refer to Ingress folder in source repo
+    oc apply -f "path/to/ingress_file_name"
+    ```
+
+- **Create Projects/Namespaces - *Dev, QA, Staging***
+
+  ```bash
+  $projectName = "<place_holder>" (Same as namespace in k8s)
+  # e.g. aro-workshop-dev
+  
+  #Deploy nginx server (for testing and health probe)
+  oc new-app nginxinc/nginx-unprivileged
+  ```
+
+  
+
+- **Deploy MongoDB**
+
+  ```bash
+  oc process openshift//mongodb-persistent -p MONGODB_USER=ratingsuser -p MONGODB_PASSWORD=ratingspassword -p MONGODB_DATABASE=ratingsdb -p MONGODB_ADMIN_PASSWORD=ratingspassword | oc create -f -
+  ```
+
+  
+
+- **Deploy RatingsWebARO**
+
+  ```bash
+  oc new-app https://github.com/monojit18/RatingsWebARO/ --context-dir=/RatingsWeb/Source
+  
+  # Go to Deployments in Web Console
+  # Select ratingswebaro deployment entry
+  # Select Environments -> Add an entry
+  API = http://ratingsapiaro.aro-workshop-dev.svc.cluster.local
+  ```
+
+  
+
+- **Deploy RatingsApiARO**
+
+  ```bash
+  oc new-app https://github.com/monojit18/RatingsApiARO/ --context-dir=/RatingsApi/Source
+  
+  # Go to Deployments in Web Console
+  # Select ratingsapiaro deployment entry
+  # Select Environments -> Add an entry
+  MONGODB_URI = mongodb://ratingsuser:ratingspassword@mongodb:27017/ratingsdb
+  ```
+
+  
+
+- **Test the entire flow**
+
+  ```bash
+  oc expose svc/ratingswebaro
+  
+  # Go to Web console
+  # Select Routes
+  # Select the newly generated route and test the app flow
+  ```
+
+  
+
+- **Hands-on-workshop**
+
+  ```bash
+  https://aroworkshop.io/
+  ```
+
+  
 
 
 

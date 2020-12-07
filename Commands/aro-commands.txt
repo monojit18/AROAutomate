@@ -155,11 +155,40 @@ oc apply -f "path/to/developers_rbac_file_name" (specify group name as developer
 #Someone from clusteradmins group can now login using AAD credentials
 #Perform all subsequent cluster configurations
 
-#Install Nginx Ingress controller - with Internal Load Balancer
+# Network Policy
+1. NetPol folder in source repo would contain sample *Network Policy* file.This can be modified to create more specific policies
+2. Define Ingress policy for each micro service (aka tyoe of PODs)
+3. Define Egress policy for each micro service (aka tyoe of PODs)
+4. Include any socaial IPs to be allowed
+5. Exclude any IPs to Disallowed
+6. Define Egress Firewall Network policy to restrict Pods accessing external links
+
+# Decide on the communication within cluster
+
+# Refer to Netpol folder in source
+
+# Define Ingress and Egress of each Pod, Namespace with aprropriate access (specific to application needs)
+
+# Deploy a sample network policy for reference
+oc apply -f "path/to/netpol_file_name"
+
+# Define Egress Firewall Network Policy
+# This is to make sure what external links the Pods within the cluster can access
+# Deploy a sample Egress network policy for reference
+oc apply -f "path/to/egress_netpol_file_name"
+
+**Secrets**
+
+- Create All Secrets needed by the micro services
+- Majorly Docker Secrets, Storage Secrets, DB Secrets etc.
+- This can be done using oc command line Or through Web Console
+
+#Install Nginx Ingress Controller - with Internal Load Balancer
+
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 
 #Install Nginx Ingress controller as Private (ILB) or Public
-
+# Refer to Ingress folder in source repo
 #For Public, comment out the following section from config file
 /* service:
     loadBalancerIP: <place_holder> #private IP */
@@ -180,18 +209,21 @@ helm install nginx-ingress ingress-nginx/ingress-nginx --namespace kube-system -
 helm uninstall nginx-ingress -n kube-system
 
 #Deploy an Ingress object
+# Refer to Ingress folder in source repo
 oc apply -f "path/to/ingress_file_name"
 
 $projectName = "<place_holder>" (Sme as namespace in k8s)
 #Create Projects/Namespaces - Dev, QA, Staging
-
-#Deploy nginx (for testing and health probe)
 oc new-project $projectName
+# e.g. aro-workshop-dev
+
+#Deploy nginx server (for testing and health probe)
+oc new-app nginxinc/nginx-unprivileged
 
 oc process openshift//mongodb-persistent -p MONGODB_USER=ratingsuser -p MONGODB_PASSWORD=ratingspassword -p MONGODB_DATABASE=ratingsdb -p MONGODB_ADMIN_PASSWORD=ratingspassword | oc create -f -
 
 oc new-app https://github.com/monojit18/RatingsWebARO/ --context-dir=/RatingsWeb/Source
-#Go to Deployments
+#Go to Deployments in Web Console
 #Select ratingswebaro deployment entry
 #Select Environments -> Add an entry
 API = http://ratingsapiaro.aro-workshop-dev.svc.cluster.local
