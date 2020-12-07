@@ -1,0 +1,24 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: aro-workshop-developer-roles
+  namespace: aro-workshop-dev
+rules:
+- apiGroups: ["", "apps", "apps.openshift.io", "events.k8s.io", "build.openshift.io", "image.openshift.io"]
+  resources: ["configmaps", "pods", "pods/log", "deployments", "replicasets", "statefulsets", "events", "deploymentconfigs", "buildconfigs", "builds", "imagestreams"]
+  verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: aro-workshop-developer-role-bindings
+  namespace: aro-workshop-dev
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: aro-workshop-developer-roles
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  name: developers
+  kind: Group

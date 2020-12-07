@@ -1,0 +1,22 @@
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: aro-netpol
+  namespace: aro-workshop-dev 
+spec:
+  podSelector:
+    matchLabels:
+      deploymentconfig: ratingsapiaro
+  policyTypes:
+  - Ingress
+  ingress:
+  - ports:
+    - protocol: TCP
+      port: 3000
+    from:
+      - namespaceSelector:
+          matchLabels:
+            name: aro-workshop-dev
+      - podSelector:
+          matchLabels:
+            deploymentconfig: ratingswebaro

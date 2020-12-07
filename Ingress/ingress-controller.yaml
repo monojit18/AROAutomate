@@ -1,0 +1,21 @@
+apiVersion: k8s.nginx.org/v1alpha1
+kind: NginxIngressController
+metadata:
+  name: my-nginx-ingress-controller
+  namespace: aro-workshop-dev
+spec:
+  enableCRDs: true
+  image:
+    pullPolicy: Always
+    repository: registry.hub.docker.com/nginx/nginx-ingress
+    tag: edge
+  nginxPlus: false
+  serviceType: LoadBalancer
+  type: deployment
+  replicas: 2
+  defaultSecret: aro-workshop-dev/default-server-secret
+  wildcardTLS: default/app-secret
+  configMapData:
+    error-log-level: debug
+  enableTLSPassthrough: false
+  globalConfiguration: aro-workshop-dev/nginx-configuration

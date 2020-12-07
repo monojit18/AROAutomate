@@ -1,0 +1,12 @@
+kind: EgressNetworkPolicy
+apiVersion: v1
+metadata:
+ name: aro-workshop-egress
+spec:
+ egress:
+ - type: Allow
+   to:
+    dnsName: arogw.eastus.cloudapp.azure.com
+ - type: Deny
+   to:
+    dnsName: aroworkshop.io
