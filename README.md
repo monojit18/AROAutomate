@@ -1,5 +1,11 @@
 # 				ARO - Anatomy of Deployment
 
+
+
+![](./Assets/ARO-Ref-Achitecture-v1.0-Ref-Arch.png)
+
+
+
 ## Prelude
 
 ARO aka *Azure RedHat OpenShift* is a managed Service on Azure - engineered jointly by Microsoft and RedHat engineers. OpenShift being a managed service around vanilla Kubernetes (K8s); ARO brings in the flavour of Azure - 
