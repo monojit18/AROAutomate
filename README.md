@@ -109,62 +109,57 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
 
           - Minimum 3 Master Nodes and 3 Worker Nodes are needed
       - Master Nodes are to sized at minimum Standard D8s v3 *(8 vcpus, 32 GiB memory)*
+        
           - Worker Nodes are sized at minimum Standard D4s v3 *(4 vcpus, 16 GiB memory)*
     
     
     
-  - **APIM subnet** (*Optional*) - One dedicated subnet for APIM. Two options are there - External VNET or Internal VNET.
-    
-        In case of *Internal* - the endpoint is completely private.
-    
-        In cade of *External* - the ingress to VNET is allowed by default and hence a proper NSG has to be added to control ingress access only from *Application Gateway*
-    
-        The address
-    
-    - *Same VNET or Separate VNET*? If one APIM across entire org then should be in a separate VNET and then peering with ARO VNET
+    - **APIM subnet** (*Optional*) - One dedicated subnet for APIM. Two options are there - External VNET or Internal VNET.
+      
+      - *Same VNET or Separate VNET*? If one APIM across entire org then should be in a separate VNET and then peering with ARO VNET
         
-    - *Address Space* - **/29** is enough for both DEV and PROD
+      - *Address Space* - **/29** is enough for both DEV and PROD
+        
         
       
+  
+  - **Integration Services VNET** - Provide Private endpoint for these all integration services peered with *ARO VNET* viz.
+  
+    - *Azure Container Registry aka ACR*
+  
+    - *Azure KeyVault*
+  
+    - *Storage*
+  
+    - *Azure SQL DB*
+  
+    - *Azure Redis Cache*
+  
+    - *Cosmos DB*
+  
+    - *Azure Service Bus*
+  
     
-    - **Integration Services VNET** - Provide Private endpoint for these all integration services peered with *ARO VNET* viz.
-    
-      - *Azure Container Registry aka ACR*
-    
-      - *Azure KeyVault*
-    
-      - *Storage*
-    
-      - *Azure SQL DB*
-    
-      - *Azure Redis Cache*
-    
-      - *Cosmos DB*
-    
-      - *Azure Service Bus*
-    
-        
-    
-    - **DevOps VNET** - *Self-hosted* DevOps agents - *Linux* or *Windows*; peered with *ARO VNET*
-    
-      
-    
-    - **NSGs to be decided Upfront**
-    
-      - Decide basic NSGs for all the subnets
-      - Some important *Inbound* rules to be followed -
-        - App G/W allows communication only from Azure Front door
-        - APIM should accept traffic only from App G/W
-        - ARO subnet should accept traffic only from APIM and/or On-Prem VNET gateway
-      - Some important *Outbound* rules to be followed -
-        - ARO Subnet outbound would always use the public *Standard LoadBalancer* created during Cluster creatiopn process. To change that behaviour - add appripriate outbound rules and anyone of the following
-          - Nat Gateway associated with ARO subnet
-          - UDR through a Firewall Subnet
-          - Forcing communication directly through web corporate proxy - this needs some amount scripting. Setting *http_proxy* or *https_proxy* can be deployed as a *Daemonset* on every ARO cluster node and force Nodes to send raffic through proxy
+  
+  - **DevOps VNET** - *Self-hosted* DevOps agents - *Linux* or *Windows*; peered with *ARO VNET*
+  
+  
+  
+  - **NSGs to be decided Upfront**
+    - Decide basic NSGs for all the subnets
+    - Some important *Inbound* rules to be followed -
+      - App G/W allows communication only from Azure Front door
+      - APIM should accept traffic only from App G/W
+      - ARO subnet should accept traffic only from APIM and/or On-Prem VNET gateway
+    - Some important *Outbound* rules to be followed -
+      - ARO Subnet outbound would always use the public *Standard LoadBalancer* created during Cluster creation process. To change that behaviour - add appripriate outbound rules and anyone of the following
+        - Nat Gateway associated with ARO subnet
+        - UDR through a Firewall Subnet
+        - Forcing communication directly through web corporate proxy - this needs some amount scripting. Setting *http_proxy* or *https_proxy* can be deployed as a *Daemonset* on every ARO cluster node and force Nodes to send raffic through proxy
 
 ### Plan Communication to Azure Services
 
-- **Private/Service Endpopints**
+- **Private/Service Endpoints**
 
   ​	Plan to use  for *Private Endpoints* (Or atleast *Service Endpoints*) wherever possible for communiction with Azure resources 	like Storage, SQL, CosmosDB etc. This makes communication secure and fast
 
@@ -291,12 +286,13 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
 
   ```bash
   $resourceGroup = "<place_holder>"
+  $vnetResourceGroup = "<place_holder>"
   $vnetName = "<place_holder>"
   $vnetIPAddress = "<place_holder>"
   $workerSubnetName = "<place_holder>"
-  $workerIPAddress = "<place_holder>"
+  $workerSubnetIPAddress = "<place_holder>"
   $masterSubnetName = "<place_holder>"
-  $masterIPAddress = "<place_holder>"
+  $masterSubnetIPAddress = "<place_holder>"
   $servicePrincipalName = "<place_holder>"
   $location = "<place_holder>"
   $clusterName = "<place_holder>"
@@ -310,22 +306,9 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
 
   ```bash
   az network vnet create \
-  --resource-group $resourceGroup \
+  --resource-group $vnetResourceGroup \
   --name $vnetName \
-  --address-prefixes $vnetIPAddress/20
-  ```
-
-  
-
-- **Add an empty subnet for the master nodes**
-
-  ```bash
-  az network vnet subnet create \
-  --name  $workerSubnetName \
-  --resource-group $resourceGroup \
-  --vnet-name $vnetName \
-  --address-prefixes $workerIPAddress/21 \
-  --service-endpoints Microsoft.ContainerRegistry
+  --address-prefixes $vnetIPAddress
   ```
 
   
@@ -334,10 +317,23 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
 
   ```bash
   az network vnet subnet create \
-  --name $masterSubnetName \
-  --resource-group $resourceGroup \
+  --name  $workerSubnetName \
+  --resource-group $vnetResourceGroup \
   --vnet-name $vnetName \
-  --address-prefixes $masterIPAddress/24 \
+  --address-prefixes $workerSubnetIPAddress \
+  --service-endpoints Microsoft.ContainerRegistry
+  ```
+
+  
+
+- **Add an empty subnet for the master nodes**
+
+  ```bash
+  az network vnet subnet create \
+  --name $masterSubnetName \
+  --resource-group $vnetResourceGroup \
+  --vnet-name $vnetName \
+  --address-prefixes $masterSubnetIPAddress \
   --service-endpoints Microsoft.ContainerRegistry
   ```
 
@@ -348,7 +344,7 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
   ```bash
   az network vnet subnet update \
   --name $masterSubnetName \
-  --resource-group $resourceGroup \
+  --resource-group $vnetResourceGroup \
   --vnet-name $vnetName \
   --disable-private-link-service-network-policies true
   ```
@@ -509,48 +505,18 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
 
 ### Deployment Phase
 
-- **Nginx Ingress Controller**
-
-  - This can be installed as a Private (ILB) or Public LB
-
-    ```bash
-    # Refer to Ingress folder in source repo
-    
-    # For Public, comment out the following section from config file
-    /* service:
-        loadBalancerIP: <place_holder> #private IP */
-    
-    helm install nginx-ingress ingress-nginx/ingress-nginx --namespace kube-system -f "path/to/ingress_config_file_name"
-    
-    helm install nginx-ingress ingress-nginx/ingress-nginx --namespace kube-system -f "path/to/ingress_config_file_name"
-    
-    # If Nginx Ingress controller is installed as Public LB
-    # The flow then would be - 
-    # Nginx Ingress Controller (Public IP) -> Kubernetes Ingress -> Backend APIs
-    
-    # If Nginx Ingress controller is installed as Private LB then another External LB is needed
-    # to communicate with Nginx Ingress and then subsequently to the APIs in ARO cluster
-    # e.g. Application Gateway
-    # The flow then would be - 
-    # App G/W -> Nginx Ingress Controller (Private IP) -> Kubernetes Ingress -> Backend APIs
-    
-    # uninstall nginx ingress controller
-    helm uninstall nginx-ingress -n kube-system
-    ```
-
-  - Deploy an Ingress object
-
-    ```bash
-    # Refer to Ingress folder in source repo
-    oc apply -f "path/to/ingress_file_name"
-    ```
-
 - **Create Projects/Namespaces - *Dev, QA, Staging***
 
   ```bash
   $projectName = "<place_holder>" (Same as namespace in k8s)
   # e.g. aro-workshop-dev
+  ```
   
+  
+  
+- **Create a Sample app***
+
+  ```bash
   #Deploy nginx server (for testing and health probe)
   oc new-app nginxinc/nginx-unprivileged
   ```
@@ -605,7 +571,7 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
 
 - **Hands-on-workshop**
 
-  ```bash
+  ```http
   https://aroworkshop.io/
   ```
 
