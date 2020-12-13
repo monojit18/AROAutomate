@@ -10,4 +10,3 @@ Test-AzResourceGroupDeployment -ResourceGroupName $rg `
 New-AzResourceGroupDeployment -ResourceGroupName $rg `
 -TemplateFile "$fpath/ACR/$deployFileName.json" `
 -acrName $acrName
-
