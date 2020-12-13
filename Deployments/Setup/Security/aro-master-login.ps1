@@ -1,5 +1,8 @@
-param([Parameter(Mandatory=$true)]    [string]  $userName = "<user_name>",
+param([Parameter(Mandatory=$true)]    [string]  $userName = "<userName>",
         [Parameter(Mandatory=$true)]  [string]  $password = "<password>",
+        [Parameter(Mandatory=$true)]  [string]  $apiServer = "<apiServerUrl>",
+        [Parameter(Mandatory=$true)]  [string]  $adminUserName = "<adminUserName>",
+        [Parameter(Mandatory=$true)]  [string]  $adminSecret = "<adminSecret>",
         [Parameter(Mandatory=$true)]  [string]  $subscriptionId = "<subscriptionId>",
         [Parameter(Mandatory=$true)]  [string]  $tenantId = "<tenantId>")
 
@@ -23,6 +26,14 @@ $LastExitCode
 if (!$?)
 {
         throw "Error Login with user - $userName"
+}
+
+$ocLoginCommand = "oc login $apiServer -u $adminUserName -p $adminSecret"
+Invoke-Expression -Command $ocLoginCommand
+$LastExitCode
+if (!$?)
+{
+        throw "Error Login through OC CLI with user - $adminUserName"
 }
 
 

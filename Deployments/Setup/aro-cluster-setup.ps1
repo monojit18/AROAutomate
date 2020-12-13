@@ -4,7 +4,7 @@ param([Parameter(Mandatory=$true)]    [string] $mode,
         [Parameter(Mandatory=$false)] [string] $location = "eastus",
         [Parameter(Mandatory=$false)] [string] $clusterName = "aro-workshop-cluster",
         [Parameter(Mandatory=$false)] [string] $keyVaultName = "aro-workshop-kv",
-        [Parameter(Mandatory=$false)] [string] $vNetName = "aro-workshop-vnet",        
+        [Parameter(Mandatory=$false)] [string] $vnetName = "aro-workshop-vnet",        
         [Parameter(Mandatory=$false)] [string] $workerSubnetName = "aro-worker-subnet",
         [Parameter(Mandatory=$false)] [string] $masterSubnetName = "aro-master-subnet",
         [Parameter(Mandatory=$false)] [string] $clusterType = "Private",
@@ -65,7 +65,7 @@ if ($mode -eq "create")
         --vnet-resource-group $vnetResourceGroup `
         --location $location `
         --name $clusterName `
-        --vnet $vNetName `
+        --vnet $vnetName `
         --master-subnet $masterSubnetName `
         --worker-subnet $workerSubnetName `
         --apiserver-visibility Private `
@@ -83,7 +83,7 @@ if ($mode -eq "create")
         --vnet-resource-group $vnetResourceGroup `
         --location $location `
         --name $clusterName `
-        --vnet $vNetName `
+        --vnet $vnetName `
         --master-subnet $masterSubnetName `
         --worker-subnet $workerSubnetName `
         --apiserver-visibility Public `

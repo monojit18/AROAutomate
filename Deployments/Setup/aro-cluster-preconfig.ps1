@@ -1,6 +1,6 @@
 param([Parameter(Mandatory=$false)]   [string] $resourceGroup = "aro-workshop-rg",
         [Parameter(Mandatory=$false)] [string] $vnetResourceGroup = "aro-workshop-rg",
-        [Parameter(Mandatory=$false)] [string] $location = "aro-workshop-rg",
+        [Parameter(Mandatory=$false)] [string] $location = "eastus",
         [Parameter(Mandatory=$false)] [string] $clusterName = "aro-workshop-cluster",
         [Parameter(Mandatory=$false)] [string] $acrName = "arowkshpacr",
         [Parameter(Mandatory=$false)] [string] $keyVaultName = "aro-workshop-kv",
@@ -64,6 +64,13 @@ Select-AzSubscription -SubscriptionId $subscriptionId
 # CLI Select Subscriotion 
 Invoke-Expression -Command $subscriptionCommand
 
+$subscription = Get-AzSubscription -SubscriptionId $subscriptionId
+if (!$subscription)
+{
+    Write-Host "Error fetching Subscription information"
+    return;
+}
+
 $rgRef = Get-AzResourceGroup -Name $resourceGroup -Location $location
 if (!$rgRef)
 {
@@ -95,8 +102,9 @@ Invoke-Expression -Command $keyVaultDeployPath
 $aroSP = Get-AzADServicePrincipal -DisplayName $aroSPName
 if (!$aroSP)
 {
-    $aroSP = New-AzADServicePrincipal -SkipAssignment -Role $aroSPRole `
-    -DisplayName $aroSPName
+    $aroSP = New-AzADServicePrincipal -SkipAssignment `
+    -Role $aroSPRole -DisplayName $aroSPName `
+    -Scope $subscription.Id
     if (!$aroSP)
     {
 
@@ -123,8 +131,19 @@ $acrSP = Get-AzADServicePrincipal -DisplayName $acrSPName
 if (!$acrSP)
 {
  
-    $acrSP = New-AzADServicePrincipal -SkipAssignment -Role $acrSPRole `
-    -DisplayName $acrSPName
+    $acrInfo = Get-AzContainerRegistry -Name $acrName `
+    -ResourceGroupName $resourceGroup
+    if (!$acrInfo)
+    {
+
+        Write-Host "Error fetching ACR information"
+        return;
+
+    }
+
+    $acrSP = New-AzADServicePrincipal -SkipAssignment `
+    -Role $acrSPRole -DisplayName $acrSPName `
+    -Scope $acrInfo.ApplicationId
     if (!$acrSP)
     {
 
