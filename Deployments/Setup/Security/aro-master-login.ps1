@@ -15,7 +15,6 @@ try
         Connect-AzAccount -Credential $spCreds -TenantId $tenantId `
         -ServicePrincipal -Subscription $subscriptionId `
         -ErrorAction Stop
-        
 }
 catch
 {
