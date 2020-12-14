@@ -127,19 +127,19 @@ if (!$aroSP)
 
 }
 
+$acrInfo = Get-AzContainerRegistry -Name $acrName `
+-ResourceGroupName $resourceGroup
+if (!$acrInfo)
+{
+
+    Write-Host "Error fetching ACR information"
+    return;
+
+}
+
 $acrSP = Get-AzADServicePrincipal -DisplayName $acrSPName
 if (!$acrSP)
 {
- 
-    $acrInfo = Get-AzContainerRegistry -Name $acrName `
-    -ResourceGroupName $resourceGroup
-    if (!$acrInfo)
-    {
-
-        Write-Host "Error fetching ACR information"
-        return;
-
-    }
 
     $acrSP = New-AzADServicePrincipal -SkipAssignment `
     -Role $acrSPRole -DisplayName $acrSPName `
@@ -163,5 +163,8 @@ if (!$acrSP)
     -SecretValue $acrSP.Secret
     
 }
+
+New-AzRoleAssignment -ApplicationId $acrSP.ApplicationId `
+-RoleDefinitionName $acrSPRole -Scope $acrInfo.Id
 
 Write-Host "-----------PreConfig------------"
