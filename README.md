@@ -292,6 +292,7 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
 
   ```bash
   resourceGroup="<place_holder>"
+  clusterResourceGroup="<place_holder>"
   location="<place_holder>"
   vnetName="<place_holder>"
   vnetIPPrefix="<place_holder>" # /20
@@ -412,6 +413,7 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
   ```bash
   az aro create \
     --resource-group $resourceGroup \
+    --cluster-resource-group $clusterResourceGroup \
     --location $location \
     --name $clusterName \
     --vnet $vnetName \
@@ -485,6 +487,17 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
    --source-addresses '*' \
    --protocols 'http=80' 'https=443' \
    --target-fqdns <place_holder>
+  
+  # Example of fqdns on Azure Firewall as below; this should work for other Firewalls as well:
+  # openshift specific (must haves) - 
+  registry.redhat.io,*.quay.io,quay.io,sso.redhat.com,management.azure.com,openshift.org,mirror.openshift.com,api.openshift.com,registry.access.redhat.com,*.grafana.com,grafana.com,management.azure.com,login.microsoftonline.com,*.servicebus.windows.net,*.table.core.windows.net,*.blob.core.windows.net,gcs.ppe.monitoring.core.windows.net,gcs.prod.monitoring.core.windows.net,storage.googleapis.com,cloud.redhat.com
+  
+  # docker specific (optional, but recommended) - 
+    *cloudflare.docker.com,*registry-1.docker.io,apt.dockerproject.org,auth.docker.io
+  
+  # custom (optional, for testing) -
+  checkip.dyndns.org
+  
   
   # Update Master and Worker Subnet with Route Table information
   az network vnet subnet update -g $resourceGroup --vnet-name $vnetName --name $masterSubnetName --route-table $routeTableName
