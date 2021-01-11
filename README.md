@@ -99,7 +99,7 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
 
           **Nd** = Max. Number of Nodes possible (approx.)
 
-          Then the total no. of addresses that you would need in ARO Subnet = ***(Np \* (Nd + 1) + Np)\***
+          Then the total no. of addresses that you would need in ARO Subnet = **(Np \* (Nd + 1) + Np)**
 
           *+1 for reserved IP by system for each Node*
 
@@ -291,19 +291,30 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
 - **Define few CLI variables; this would facilitate the running of subsequent commands**
 
   ```bash
-  $resourceGroup = "<place_holder>"
-  $vnetResourceGroup = "<place_holder>"
-  $vnetName = "<place_holder>"
-  $vnetIPAddress = "<place_holder>"
-  $workerSubnetName = "<place_holder>"
-  $workerSubnetIPAddress = "<place_holder>"
-  $masterSubnetName = "<place_holder>"
-  $masterSubnetIPAddress = "<place_holder>"
-  $servicePrincipalName = "<place_holder>"
-  $location = "<place_holder>"
-  $clusterName = "<place_holder>"
-  $workerCount = 4 # change accordingly <num>
-  $clusterType = "Public" # Public/Private
+  resourceGroup="<place_holder>"
+  location="<place_holder>"
+  vnetName="<place_holder>"
+  vnetIPPrefix="<place_holder>" # /20
+  masterSubnetName="<place_holder>"
+  masterIPPrefix="<place_holder>" # /24
+  workerSubnetName="<place_holder>"
+  workerIPPrefix="<place_holder>" # /21
+  firewallSubnetName="AzureFirewallSubnet"
+  firewallIPPrefix="<place_holder>" #/26
+  firewallName="<place_holder>"
+  firewallPublicIPName="$firewallName-pip"
+  firewallPublicIPConfigName="$firewallName-pip-config"
+  routeTableName="<place_holder>"
+  routeName="aro-internal"
+  clusterDomain="<place_holder>"
+  clusterName="<place_holder>"
+  workerCount=4
+  workerVMSize="Standard_D4s_v3"
+  clusterType="Private"
+  ingressType="Private"
+  servicePrincipalName="<place_holder>"
+  subId=$(az account show --query="id" -o tsv)
+  subResourceId="/subscriptions/$subId"
   ```
 
   
@@ -312,25 +323,10 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
 
   ```bash
   az network vnet create \
-  --resource-group $vnetResourceGroup \
+  --resource-group $resourceGroup \
   --name $vnetName \
-  --address-prefixes $vnetIPAddress
+  --address-prefixes $vnetIPPrefix
   ```
-
-  
-
-- **Add an empty subnet for the worker nodes**
-
-  ```bash
-  az network vnet subnet create \
-  --name  $workerSubnetName \
-  --resource-group $vnetResourceGroup \
-  --vnet-name $vnetName \
-  --address-prefixes $workerSubnetIPAddress \
-  --service-endpoints Microsoft.ContainerRegistry
-  ```
-
-  
 
 - **Add an empty subnet for the master nodes**
 
@@ -345,14 +341,52 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
 
   
 
+- **Add an empty subnet for the worker nodes**
+
+  ```bash
+  az network vnet subnet create \
+  --name $workerSubnetName \
+  --resource-group $resourceGroup \
+  --vnet-name $vnetName \
+  --address-prefixes $workerIPPrefix \
+  --service-endpoints Microsoft.ContainerRegistry
+  ```
+
+  
+
 - **Disable subnet private endpoint policies**
 
   ```bash
   az network vnet subnet update \
   --name $masterSubnetName \
-  --resource-group $vnetResourceGroup \
+  --resource-group $resourceGroup \
   --vnet-name $vnetName \
   --disable-private-link-service-network-policies true
+  ```
+
+- **Add an empty subnet for the Azure Firewall**
+
+  ```bash
+  az network vnet subnet create \
+  --name $firewallSubnetName \
+  --resource-group $resourceGroup \
+  --vnet-name $vnetName \
+  --address-prefixes $firewallIPPrefix
+  ```
+
+- **Configure Azure Firewall and associated resources**
+
+  ```bash
+  az network public-ip create -g $resourceGroup -n $firewallPublicIPName --sku "Standard" --location $location
+  az network firewall create -g $resourceGroup -n $firewallName -l $location
+  az network firewall ip-config create -g $resourceGroup -f $firewallName -n $firewallPublicIPConfigName --public-ip-address $firewallPublicIPName --vnet-name $vnetName
+  
+  FWPUBLIC_IP=$(az network public-ip show -g $resourceGroup -n $firewallPublicIPName --query "ipAddress" -o tsv)
+  FWPRIVATE_IP=$(az network firewall show -g $resourceGroup -n $firewallName --query "ipConfigurations[0].privateIpAddress" -o tsv)
+  
+  echo $FWPUBLIC_IP
+  echo $FWPRIVATE_IP
+  
   ```
 
   
@@ -360,7 +394,7 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
 - **Create Service Principal for ARO cluster**
 
   ```bash
-  az ad sp create-for-rbac --role Contributor -n $servicePrincipalName
+  az ad sp create-for-rbac --role Contributor -n $servicePrincipalName --scope $subResourceId
   # Note down the response
   {
     "appId": "<client_id>",
@@ -384,11 +418,13 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
     --master-subnet $masterSubnetName \
     --worker-subnet $workerSubnetName \
     --apiserver-visibility $clusterType \
-    --ingress-visibility $clusterType \
+    --ingress-visibility $ingressType \
     --worker-count $workerCount \
+    --worker-vm-size $workerVMSize \
     --client-id "<client_id>" \
     --client-secret "<client_secret>" \
-    --pull-secret @"/path/to/pull-secret.txt"
+    --pull-secret @"/path/to/pull-secret.txt" \
+    --domain $clusterDomain
   ```
 
   
@@ -402,7 +438,9 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
   domain=$(az aro show -n $clusterName -g $resourceGroup --query clusterProfile.domain -o tsv)
   location=$(az aro show -n $clusterName -g $resourceGroup --query location -o tsv)
   apiServer=$(az aro show -n $clusterName -g $resourceGroup --query apiserverProfile.url -o tsv)
+  apiServerIP=$(az aro show -n $clusterName -g $resourceGroup --query apiserverProfile.ip -o tsv)
   webConsole=$(az aro show -n $clusterName -g $resourceGroup --query consoleProfile.url -o tsv)
+  ingressIP=$(az aro show -n $clusterName -g $resourceGroup --query ingressProfiles[0].ip -o tsv)
   
   echo $creds
   {
@@ -412,6 +450,48 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
   }
   ```
 
+- **Configure Egress Routing**
+
+  ```bash
+  # Create Route Table
+  az network route-table create -g $resourceGroup --name $routeTableName
+  az network route-table route create -g $resourceGroup --name $routeName --route-table-name $routeTableName --address-prefix 0.0.0.0/0 --next-hop-type VirtualAppliance --next-hop-ip-address $FWPRIVATE_IP
+  
+  # Add Firewall Rules
+  
+  az network firewall application-rule create -g $resourceGroup -f aro-private \
+   --collection-name 'openshift-rules' \
+   --action allow \
+   --priority 100 \
+   -n 'apps/api' \
+   --source-addresses '*' \
+   --protocols 'http=80' 'https=443' 'https=6443' \
+   --target-fqdns '*.apps.$domain' 'api.$domain'
+   
+  az network firewall application-rule create -g $resourceGroup -f aro-private \
+   --collection-name 'openshift-rules' \
+   --action allow \
+   --priority 200 \
+   -n 'required' \
+   --source-addresses '*' \
+   --protocols 'http=80' 'https=443' \
+   --target-fqdns <place_holder>
+   
+   az network firewall application-rule create -g $resourceGroup -f aro-private \
+   --collection-name 'docker' \
+   --action allow \
+   --priority 300 \
+   -n 'docker' \
+   --source-addresses '*' \
+   --protocols 'http=80' 'https=443' \
+   --target-fqdns <place_holder>
+  
+  # Update Master and Worker Subnet with Route Table information
+  az network vnet subnet update -g $resourceGroup --vnet-name $vnetName --name $masterSubnetName --route-table $routeTableName
+  az network vnet subnet update -g $resourceGroup --vnet-name $vnetName --name $workerSubnetName --route-table $routeTableName
+  
+  ```
+
   
 
 - **Issuer URL -** 
@@ -419,7 +499,7 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
   - This is to be used during Azure AD integration
 
   ```bash
-  oauthCallbackURL=https://oauth-openshift.apps.$domain.$location.aroapp.io/oauth2callback/AAD
+  oauthCallbackURL=https://oauth-openshift.apps.$domain/oauth2callback/AAD
   ```
 
   
