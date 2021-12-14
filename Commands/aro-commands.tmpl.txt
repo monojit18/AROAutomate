@@ -56,6 +56,8 @@ $clusterName = "<place_holder>"
 $workerCount = 4 #change accordingly <num>
 $clusterType = "Public" #Public/Private
 
+az vm list-usage -l $location --query "[?contains(name.value, 'standardDSv3Family')]" -o table
+
 
 #Create a virtual network containing two empty subnets -
 az network vnet create \
