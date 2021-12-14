@@ -1,0 +1,83 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+      "vnetName": {
+        "type": "string"
+      },
+      "vnetPrefix": {
+        "type": "string"
+      },      
+      "masterSubnetName": {
+        "type": "string"
+      },
+      "masterSubNetPrefix": {
+        "type": "string"     
+      },
+      "workerSubnetName": {
+        "type": "string"
+      },
+      "workerSubNetPrefix": {
+        "type": "string"     
+      },            
+      "location": {
+        "type": "string",
+        "defaultValue": "[resourceGroup().location]"
+      }
+    },
+    "variables": {},
+    "resources": [
+      {
+        "apiVersion": "2018-10-01",
+        "type": "Microsoft.Network/virtualNetworks",
+        "name": "[parameters('vnetName')]",
+        "location": "[parameters('location')]",
+        "properties": {
+          "addressSpace": {
+            "addressPrefixes": [
+              "[parameters('vnetPrefix')]"
+            ]
+          }
+        },
+        "resources": [
+          {
+            "apiVersion": "2018-10-01",
+            "type": "subnets",
+            "location": "[parameters('location')]",
+            "name": "[parameters('workerSubnetName')]",
+            "dependsOn": [
+              "[parameters('vnetName')]"
+            ],
+            "properties": {
+              "addressPrefix": "[parameters('workerSubNetPrefix')]",
+              "serviceEndpoints": [
+                {
+                  "service": "Microsoft.ContainerRegistry"
+                }
+              ]
+            }
+          }, 
+          {
+            "apiVersion": "2018-10-01",
+            "type": "subnets",
+            "location": "[parameters('location')]",
+            "name": "[parameters('masterSubnetName')]",
+            "dependsOn": [
+              "[parameters('vnetName')]",
+              "[parameters('workerSubnetName')]"
+            ],
+            "properties": {
+              "addressPrefix": "[parameters('masterSubNetPrefix')]",
+              "privateLinkServiceNetworkPolicies": "Disabled" ,
+              "serviceEndpoints": [
+                {
+                  "service": "Microsoft.ContainerRegistry"
+                }
+              ]
+            }
+          }                  
+        ]
+      }
+    ]
+  }
+  

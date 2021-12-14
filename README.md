@@ -1,5 +1,11 @@
 # 				ARO - Anatomy of Deployment
 
+
+
+![](./Assets/ARO-Ref-Achitecture-v1.0-Ref-Arch.png)
+
+
+
 ## Prelude
 
 ARO aka *Azure RedHat OpenShift* is a managed Service on Azure - engineered jointly by Microsoft and RedHat engineers. OpenShift being a managed service around vanilla Kubernetes (K8s); ARO brings in the flavour of Azure - 
@@ -93,7 +99,7 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
 
           **Nd** = Max. Number of Nodes possible (approx.)
 
-          Then the total no. of addresses that you would need in ARO Subnet = ***(Np \* (Nd + 1) + Np)\***
+          Then the total no. of addresses that you would need in ARO Subnet = **(Np \* (Nd + 1) + Np)**
 
           *+1 for reserved IP by system for each Node*
 
@@ -109,62 +115,57 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
 
           - Minimum 3 Master Nodes and 3 Worker Nodes are needed
       - Master Nodes are to sized at minimum Standard D8s v3 *(8 vcpus, 32 GiB memory)*
+        
           - Worker Nodes are sized at minimum Standard D4s v3 *(4 vcpus, 16 GiB memory)*
     
     
     
-  - **APIM subnet** (*Optional*) - One dedicated subnet for APIM. Two options are there - External VNET or Internal VNET.
-    
-        In case of *Internal* - the endpoint is completely private.
-    
-        In cade of *External* - the ingress to VNET is allowed by default and hence a proper NSG has to be added to control ingress access only from *Application Gateway*
-    
-        The address
-    
-    - *Same VNET or Separate VNET*? If one APIM across entire org then should be in a separate VNET and then peering with ARO VNET
+    - **APIM subnet** (*Optional*) - One dedicated subnet for APIM. Two options are there - External VNET or Internal VNET.
+      
+      - *Same VNET or Separate VNET*? If one APIM across entire org then should be in a separate VNET and then peering with ARO VNET
         
-    - *Address Space* - **/29** is enough for both DEV and PROD
+      - *Address Space* - **/29** is enough for both DEV and PROD
+        
         
       
+  
+  - **Integration Services VNET** - Provide Private endpoint for these all integration services peered with *ARO VNET* viz.
+  
+    - *Azure Container Registry aka ACR*
+  
+    - *Azure KeyVault*
+  
+    - *Storage*
+  
+    - *Azure SQL DB*
+  
+    - *Azure Redis Cache*
+  
+    - *Cosmos DB*
+  
+    - *Azure Service Bus*
+  
     
-    - **Integration Services VNET** - Provide Private endpoint for these all integration services peered with *ARO VNET* viz.
-    
-      - *Azure Container Registry aka ACR*
-    
-      - *Azure KeyVault*
-    
-      - *Storage*
-    
-      - *Azure SQL DB*
-    
-      - *Azure Redis Cache*
-    
-      - *Cosmos DB*
-    
-      - *Azure Service Bus*
-    
-        
-    
-    - **DevOps VNET** - *Self-hosted* DevOps agents - *Linux* or *Windows*; peered with *ARO VNET*
-    
-      
-    
-    - **NSGs to be decided Upfront**
-    
-      - Decide basic NSGs for all the subnets
-      - Some important *Inbound* rules to be followed -
-        - App G/W allows communication only from Azure Front door
-        - APIM should accept traffic only from App G/W
-        - ARO subnet should accept traffic only from APIM and/or On-Prem VNET gateway
-      - Some important *Outbound* rules to be followed -
-        - ARO Subnet outbound would always use the public *Standard LoadBalancer* created during Cluster creatiopn process. To change that behaviour - add appripriate outbound rules and anyone of the following
-          - Nat Gateway associated with ARO subnet
-          - UDR through a Firewall Subnet
-          - Forcing communication directly through web corporate proxy - this needs some amount scripting. Setting *http_proxy* or *https_proxy* can be deployed as a *Daemonset* on every ARO cluster node and force Nodes to send raffic through proxy
+  
+  - **DevOps VNET** - *Self-hosted* DevOps agents - *Linux* or *Windows*; peered with *ARO VNET*
+  
+  
+  
+  - **NSGs to be decided Upfront**
+    - Decide basic NSGs for all the subnets
+    - Some important *Inbound* rules to be followed -
+      - App G/W allows communication only from Azure Front door
+      - APIM should accept traffic only from App G/W
+      - ARO subnet should accept traffic only from APIM and/or On-Prem VNET gateway
+    - Some important *Outbound* rules to be followed -
+      - ARO Subnet outbound would always use the public *Standard LoadBalancer* created during Cluster creation process. To change that behaviour - add appripriate outbound rules and anyone of the following
+        - Nat Gateway associated with ARO subnet
+        - UDR through a Firewall Subnet
+        - Forcing communication directly through web corporate proxy - this needs some amount scripting. Setting *http_proxy* or *https_proxy* can be deployed as a *Daemonset* on every ARO cluster node and force Nodes to send raffic through proxy
 
 ### Plan Communication to Azure Services
 
-- **Private/Service Endpopints**
+- **Private/Service Endpoints**
 
   ​	Plan to use  for *Private Endpoints* (Or atleast *Service Endpoints*) wherever possible for communiction with Azure resources 	like Storage, SQL, CosmosDB etc. This makes communication secure and fast
 
@@ -290,18 +291,31 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
 - **Define few CLI variables; this would facilitate the running of subsequent commands**
 
   ```bash
-  $resourceGroup = "<place_holder>"
-  $vnetName = "<place_holder>"
-  $vnetIPAddress = "<place_holder>"
-  $workerSubnetName = "<place_holder>"
-  $workerIPAddress = "<place_holder>"
-  $masterSubnetName = "<place_holder>"
-  $masterIPAddress = "<place_holder>"
-  $servicePrincipalName = "<place_holder>"
-  $location = "<place_holder>"
-  $clusterName = "<place_holder>"
-  $workerCount = 4 # change accordingly <num>
-  $clusterType = "Public" # Public/Private
+  resourceGroup="<place_holder>"
+  clusterResourceGroup="<place_holder>"
+  location="<place_holder>"
+  vnetName="<place_holder>"
+  vnetIPPrefix="<place_holder>" # /20
+  masterSubnetName="<place_holder>"
+  masterIPPrefix="<place_holder>" # /24
+  workerSubnetName="<place_holder>"
+  workerIPPrefix="<place_holder>" # /21
+  firewallSubnetName="AzureFirewallSubnet"
+  firewallIPPrefix="<place_holder>" #/26
+  firewallName="<place_holder>"
+  firewallPublicIPName="$firewallName-pip"
+  firewallPublicIPConfigName="$firewallName-pip-config"
+  routeTableName="<place_holder>"
+  routeName="aro-internal"
+  clusterDomain="<place_holder>"
+  clusterName="<place_holder>"
+  workerCount=4
+  workerVMSize="Standard_D4s_v3"
+  clusterType="Private"
+  ingressType="Private"
+  servicePrincipalName="<place_holder>"
+  subId=$(az account show --query="id" -o tsv)
+  subResourceId="/subscriptions/$subId"
   ```
 
   
@@ -312,19 +326,17 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
   az network vnet create \
   --resource-group $resourceGroup \
   --name $vnetName \
-  --address-prefixes $vnetIPAddress/20
+  --address-prefixes $vnetIPPrefix
   ```
-
-  
 
 - **Add an empty subnet for the master nodes**
 
   ```bash
   az network vnet subnet create \
-  --name  $workerSubnetName \
-  --resource-group $resourceGroup \
+  --name $masterSubnetName \
+  --resource-group $vnetResourceGroup \
   --vnet-name $vnetName \
-  --address-prefixes $workerIPAddress/21 \
+  --address-prefixes $masterSubnetIPAddress \
   --service-endpoints Microsoft.ContainerRegistry
   ```
 
@@ -334,10 +346,10 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
 
   ```bash
   az network vnet subnet create \
-  --name $masterSubnetName \
+  --name $workerSubnetName \
   --resource-group $resourceGroup \
   --vnet-name $vnetName \
-  --address-prefixes $masterIPAddress/24 \
+  --address-prefixes $workerIPPrefix \
   --service-endpoints Microsoft.ContainerRegistry
   ```
 
@@ -353,12 +365,37 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
   --disable-private-link-service-network-policies true
   ```
 
+- **Add an empty subnet for the Azure Firewall**
+
+  ```bash
+  az network vnet subnet create \
+  --name $firewallSubnetName \
+  --resource-group $resourceGroup \
+  --vnet-name $vnetName \
+  --address-prefixes $firewallIPPrefix
+  ```
+
+- **Configure Azure Firewall and associated resources**
+
+  ```bash
+  az network public-ip create -g $resourceGroup -n $firewallPublicIPName --sku "Standard" --location $location
+  az network firewall create -g $resourceGroup -n $firewallName -l $location
+  az network firewall ip-config create -g $resourceGroup -f $firewallName -n $firewallPublicIPConfigName --public-ip-address $firewallPublicIPName --vnet-name $vnetName
+  
+  FWPUBLIC_IP=$(az network public-ip show -g $resourceGroup -n $firewallPublicIPName --query "ipAddress" -o tsv)
+  FWPRIVATE_IP=$(az network firewall show -g $resourceGroup -n $firewallName --query "ipConfigurations[0].privateIpAddress" -o tsv)
+  
+  echo $FWPUBLIC_IP
+  echo $FWPRIVATE_IP
+  
+  ```
+
   
 
 - **Create Service Principal for ARO cluster**
 
   ```bash
-  az ad sp create-for-rbac --role Contributor -n $servicePrincipalName
+  az ad sp create-for-rbac --role Contributor -n $servicePrincipalName --scope $subResourceId
   # Note down the response
   {
     "appId": "<client_id>",
@@ -376,17 +413,20 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
   ```bash
   az aro create \
     --resource-group $resourceGroup \
+    --cluster-resource-group $clusterResourceGroup \
     --location $location \
     --name $clusterName \
     --vnet $vnetName \
     --master-subnet $masterSubnetName \
     --worker-subnet $workerSubnetName \
     --apiserver-visibility $clusterType \
-    --ingress-visibility $clusterType \
+    --ingress-visibility $ingressType \
     --worker-count $workerCount \
+    --worker-vm-size $workerVMSize \
     --client-id "<client_id>" \
     --client-secret "<client_secret>" \
-    --pull-secret @"/path/to/pull-secret.txt"
+    --pull-secret @"/path/to/pull-secret.txt" \
+    --domain $clusterDomain
   ```
 
   
@@ -400,7 +440,9 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
   domain=$(az aro show -n $clusterName -g $resourceGroup --query clusterProfile.domain -o tsv)
   location=$(az aro show -n $clusterName -g $resourceGroup --query location -o tsv)
   apiServer=$(az aro show -n $clusterName -g $resourceGroup --query apiserverProfile.url -o tsv)
+  apiServerIP=$(az aro show -n $clusterName -g $resourceGroup --query apiserverProfile.ip -o tsv)
   webConsole=$(az aro show -n $clusterName -g $resourceGroup --query consoleProfile.url -o tsv)
+  ingressIP=$(az aro show -n $clusterName -g $resourceGroup --query ingressProfiles[0].ip -o tsv)
   
   echo $creds
   {
@@ -410,6 +452,59 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
   }
   ```
 
+- **Configure Egress Routing**
+
+  ```bash
+  # Create Route Table
+  az network route-table create -g $resourceGroup --name $routeTableName
+  az network route-table route create -g $resourceGroup --name $routeName --route-table-name $routeTableName --address-prefix 0.0.0.0/0 --next-hop-type VirtualAppliance --next-hop-ip-address $FWPRIVATE_IP
+  
+  # Add Firewall Rules
+  
+  az network firewall application-rule create -g $resourceGroup -f aro-private \
+   --collection-name 'openshift-rules' \
+   --action allow \
+   --priority 100 \
+   -n 'apps/api' \
+   --source-addresses '*' \
+   --protocols 'http=80' 'https=443' 'https=6443' \
+   --target-fqdns '*.apps.$domain' 'api.$domain'
+   
+  az network firewall application-rule create -g $resourceGroup -f aro-private \
+   --collection-name 'openshift-rules' \
+   --action allow \
+   --priority 200 \
+   -n 'required' \
+   --source-addresses '*' \
+   --protocols 'http=80' 'https=443' \
+   --target-fqdns <place_holder>
+   
+   az network firewall application-rule create -g $resourceGroup -f aro-private \
+   --collection-name 'docker' \
+   --action allow \
+   --priority 300 \
+   -n 'docker' \
+   --source-addresses '*' \
+   --protocols 'http=80' 'https=443' \
+   --target-fqdns <place_holder>
+  
+  # Example of fqdns on Azure Firewall as below; this should work for other Firewalls as well:
+  # openshift specific (must haves) - 
+  registry.redhat.io,*.quay.io,quay.io,sso.redhat.com,management.azure.com,openshift.org,mirror.openshift.com,api.openshift.com,registry.access.redhat.com,*.grafana.com,grafana.com,management.azure.com,login.microsoftonline.com,*.servicebus.windows.net,*.table.core.windows.net,*.blob.core.windows.net,gcs.ppe.monitoring.core.windows.net,gcs.prod.monitoring.core.windows.net,storage.googleapis.com,cloud.redhat.com
+  
+  # docker specific (optional, but recommended) - 
+    *cloudflare.docker.com,*registry-1.docker.io,apt.dockerproject.org,auth.docker.io
+  
+  # custom (optional, for testing) -
+  checkip.dyndns.org
+  
+  
+  # Update Master and Worker Subnet with Route Table information
+  az network vnet subnet update -g $resourceGroup --vnet-name $vnetName --name $masterSubnetName --route-table $routeTableName
+  az network vnet subnet update -g $resourceGroup --vnet-name $vnetName --name $workerSubnetName --route-table $routeTableName
+  
+  ```
+
   
 
 - **Issuer URL -** 
@@ -417,7 +512,7 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
   - This is to be used during Azure AD integration
 
   ```bash
-  oauthCallbackURL=https://oauth-openshift.apps.$domain.$location.aroapp.io/oauth2callback/AAD
+  oauthCallbackURL=https://oauth-openshift.apps.$domain/oauth2callback/AAD
   ```
 
   
@@ -509,48 +604,18 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
 
 ### Deployment Phase
 
-- **Nginx Ingress Controller**
-
-  - This can be installed as a Private (ILB) or Public LB
-
-    ```bash
-    # Refer to Ingress folder in source repo
-    
-    # For Public, comment out the following section from config file
-    /* service:
-        loadBalancerIP: <place_holder> #private IP */
-    
-    helm install nginx-ingress ingress-nginx/ingress-nginx --namespace kube-system -f "path/to/ingress_config_file_name"
-    
-    helm install nginx-ingress ingress-nginx/ingress-nginx --namespace kube-system -f "path/to/ingress_config_file_name"
-    
-    # If Nginx Ingress controller is installed as Public LB
-    # The flow then would be - 
-    # Nginx Ingress Controller (Public IP) -> Kubernetes Ingress -> Backend APIs
-    
-    # If Nginx Ingress controller is installed as Private LB then another External LB is needed
-    # to communicate with Nginx Ingress and then subsequently to the APIs in ARO cluster
-    # e.g. Application Gateway
-    # The flow then would be - 
-    # App G/W -> Nginx Ingress Controller (Private IP) -> Kubernetes Ingress -> Backend APIs
-    
-    # uninstall nginx ingress controller
-    helm uninstall nginx-ingress -n kube-system
-    ```
-
-  - Deploy an Ingress object
-
-    ```bash
-    # Refer to Ingress folder in source repo
-    oc apply -f "path/to/ingress_file_name"
-    ```
-
 - **Create Projects/Namespaces - *Dev, QA, Staging***
 
   ```bash
   $projectName = "<place_holder>" (Same as namespace in k8s)
   # e.g. aro-workshop-dev
+  ```
   
+  
+  
+- **Create a Sample app***
+
+  ```bash
   #Deploy nginx server (for testing and health probe)
   oc new-app nginxinc/nginx-unprivileged
   ```
@@ -605,7 +670,7 @@ This is to ensure a proper RBAC is implemented providing restricted access to va
 
 - **Hands-on-workshop**
 
-  ```bash
+  ```http
   https://aroworkshop.io/
   ```
 
