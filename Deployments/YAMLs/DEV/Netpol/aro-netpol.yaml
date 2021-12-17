@@ -6,7 +6,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      deploymentconfig: ratingsapiaro
+      deployment: mslearn-aks-workshop-ratings-api
   policyTypes:
   - Ingress
   ingress:
@@ -16,7 +16,7 @@ spec:
     from:
       - namespaceSelector:
           matchLabels:
-            name: aro-workshop-dev
-      - podSelector:
+            kubernetes.io/metadata.name: aro-workshop-dev
+        podSelector:
           matchLabels:
-            deploymentconfig: ratingswebaro
+            deployment: mslearn-aks-workshop-ratings-web
