@@ -1,25 +1,25 @@
-param([Parameter(Mandatory=$true)] [string] $resourceGroup = "aro-workshop-rg",
-      [Parameter(Mandatory=$true)] [string] $vnetResourceGroup = "aro-workshop-rg",
-      [Parameter(Mandatory=$true)] [string] $location = "eastus",
-      [Parameter(Mandatory=$true)] [string] $clusterName = "aro-workshop-cluster",
-      [Parameter(Mandatory=$true)] [string] $acrName = "arowkshpacr",
-      [Parameter(Mandatory=$true)] [string] $keyVaultName = "aro-workshop-kv",
-      [Parameter(Mandatory=$true)] [string] $aroSPName = "aro-workshop-sp",
-      [Parameter(Mandatory=$true)] [string] $acrSPName = "aro-workshop-acr-sp",
-      [Parameter(Mandatory=$true)] [string] $vnetName = "aro-workshop-vnet",
-      [Parameter(Mandatory=$true)] [string] $vnetPrefix = "181.0.0.0/20",
-      [Parameter(Mandatory=$true)] [string] $workerSubnetName = "aro-worker-subnet",
-      [Parameter(Mandatory=$true)] [string] $workerSubNetPrefix = "181.0.0.0/21",
-      [Parameter(Mandatory=$true)] [string] $masterSubnetName = "aro-master-subnet",
-      [Parameter(Mandatory=$true)] [string] $masterSubNetPrefix = "181.0.8.0/24",        
-      # [Parameter(Mandatory=$true)] [string] $appgwName = "aro-workshop-appgw",
-      [Parameter(Mandatory=$true)] [string] $networkTemplateFileName = "aro-network-deploy",
-      [Parameter(Mandatory=$true)] [string] $acrTemplateFileName = "aro-acr-deploy",
-      [Parameter(Mandatory=$true)] [string] $kvTemplateFileName = "aro-keyvault-deploy",
-      [Parameter(Mandatory=$true)] [string] $subscriptionId = "<subscriptionId>",
-      [Parameter(Mandatory=$true)] [string] $objectId = "<objectId>",
-      [Parameter(Mandatory=$true)] [string] $tenantId = "<tenantId>",
-      [Parameter(Mandatory=$true)] [string] $baseFolderPath = "<baseFolderPath>") # As per host machine
+param([Parameter(Mandatory=$false)]   [string] $resourceGroup = "aro-workshop-rg",
+        [Parameter(Mandatory=$false)] [string] $vnetResourceGroup = "aro-workshop-rg",
+        [Parameter(Mandatory=$false)] [string] $location = "eastus",
+        [Parameter(Mandatory=$false)] [string] $clusterName = "aro-workshop-cluster",
+        [Parameter(Mandatory=$false)] [string] $acrName = "arowkshpacr",
+        [Parameter(Mandatory=$false)] [string] $keyVaultName = "aro-workshop-kv",
+        [Parameter(Mandatory=$false)] [string] $aroSPName = "aro-workshop-sp",
+        [Parameter(Mandatory=$false)] [string] $acrSPName = "aro-workshop-acr-sp",
+        [Parameter(Mandatory=$false)] [string] $vnetName = "aro-workshop-vnet",
+        [Parameter(Mandatory=$false)] [string] $vnetPrefix = "181.0.0.0/20",
+        [Parameter(Mandatory=$false)] [string] $workerSubnetName = "aro-worker-subnet",
+        [Parameter(Mandatory=$false)] [string] $workerSubNetPrefix = "181.0.0.0/21",
+        [Parameter(Mandatory=$false)] [string] $masterSubnetName = "aro-master-subnet",
+        [Parameter(Mandatory=$false)] [string] $masterSubNetPrefix = "181.0.8.0/24",        
+        # [Parameter(Mandatory=$false)] [string] $appgwName = "aro-workshop-appgw",
+        [Parameter(Mandatory=$false)] [string] $networkTemplateFileName = "aro-network-deploy",
+        [Parameter(Mandatory=$false)] [string] $acrTemplateFileName = "aro-acr-deploy",
+        [Parameter(Mandatory=$false)] [string] $kvTemplateFileName = "aro-keyvault-deploy",        
+        [Parameter(Mandatory=$true)]  [string] $subscriptionId = "<subscriptionId>",
+        [Parameter(Mandatory=$true)]  [string] $objectId = "<objectId>",        
+        [Parameter(Mandatory=$true)]  [string] $tenantId = "<tenantId>",
+        [Parameter(Mandatory=$true)]  [string] $baseFolderPath = "<baseFolderPath>") # As per host machine
 
 $aroSPRole = "Contributor"
 $aroSPIdName = $clusterName + "-sp-id"
@@ -84,15 +84,8 @@ if (!$rgRef)
 
 }
 
-$aroVnet = Get-AzVirtualNetwork -Name $vnetName `
--ResourceGroupName $resourceGroup
 $networkDeployPath = $templatesFolderPath + $networkDeployCommand
-if (!$aroVnet)
-{
-    
-    Invoke-Expression -Command $networkDeployPath    
-
-}
+Invoke-Expression -Command $networkDeployPath
 
 $acrDeployPath = $templatesFolderPath + $acrDeployCommand
 Invoke-Expression -Command $acrDeployPath
@@ -110,7 +103,8 @@ $aroSP = Get-AzADServicePrincipal -DisplayName $aroSPName
 if (!$aroSP)
 {
     $aroSP = New-AzADServicePrincipal -SkipAssignment `
-    -DisplayName $aroSPName
+    -Role $aroSPRole -DisplayName $aroSPName `
+    -Scope $subscription.Id
     if (!$aroSP)
     {
 
@@ -131,9 +125,6 @@ if (!$aroSP)
     -SecretValue $aroSP.Secret
     Write-Host $aroSPSecretName
 
-    New-AzRoleAssignment -RoleDefinitionName $aroSPRole  `
-    -ApplicationId $aroSP.ApplicationId -Scope $subscription.Id
-
 }
 
 $acrInfo = Get-AzContainerRegistry -Name $acrName `
@@ -151,7 +142,8 @@ if (!$acrSP)
 {
 
     $acrSP = New-AzADServicePrincipal -SkipAssignment `
-    -DisplayName $acrSPName
+    -Role $acrSPRole -DisplayName $acrSPName `
+    -Scope $acrInfo.ApplicationId
     if (!$acrSP)
     {
 
@@ -169,13 +161,10 @@ if (!$acrSP)
 
     Set-AzKeyVaultSecret -VaultName $keyVaultName -Name $acrSPSecretName `
     -SecretValue $acrSP.Secret
-
-    New-AzRoleAssignment -RoleDefinitionName $acrSPRole  `
-    -ApplicationId $acrSP.ApplicationId -Scope $subscription.Id
     
 }
 
 New-AzRoleAssignment -ApplicationId $acrSP.ApplicationId `
 -RoleDefinitionName $acrSPRole -Scope $acrInfo.Id
 
-Write-Host "----------------PreConfig----------------"
+Write-Host "-----------PreConfig------------"

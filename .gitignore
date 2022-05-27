@@ -1,2 +1,5 @@
 !.gitignore
 **/aro-commands.txt
+**/Certs/**
+**/Misc/openshift-client-mac*
+**/Misc/pull-secret.txt

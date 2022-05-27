@@ -43,92 +43,89 @@ az extension update -n aro --index https://az.aroapp.io/stable
 #Get a Red Hat pull secret (optional)
 https://cloud.redhat.com/openshift/install/azure/aro-provisioned (Register or Login)
 
-$resourceGroup = "<place_holder>"
-$vnetName = "<place_holder>"
-$vnetIPAddress = "<place_holder>"
-$workerSubnetName = "<place_holder>"
-$workerIPAddress = "<place_holder>"
-$masterSubnetName = "<place_holder>"
-$masterIPAddress = "<place_holder>"
-$servicePrincipalName = "<place_holder>"
-$location = "<place_holder>"
-$clusterName = "<place_holder>"
-$workerCount = 4 #change accordingly <num>
-$clusterType = "Public" #Public/Private
+tenantId=""
+subscriptionId=""
+resourceGroup="aro-workshop-rg"
+clusterName="aroworkshopcluster"
+domain="internal.wkshpdev.com"
+vnetName="aro-workshop-vnet"
+vnetIPAddress="20.0.0.0/21"
+masterSubnetName="master"
+masterIPAddress="20.0.0.0/23"
+workerSubnetName="worker"
+workerIPAddress="20.0.2.0/23"
+servicePrincipalName="https://$clusterName-sp"
+location="eastus"
+workerCount=3
+clusterType="Private"
+ingressType="Private"
+baseFolderPath="/Users/monojitdattams/Development/Projects/Workshops/AROWorkshop/AROAutomate/Deployments"
+setupFolderPath="$baseFolderPath/Setup"
 
 az vm list-usage -l $location --query "[?contains(name.value, 'standardDSv3Family')]" -o table
 
+#Create a virtual network containing two empty subnets
+az network vnet create --resource-group $resourceGroup --name $vnetName --address-prefixes $vnetIPAddress
 
-#Create a virtual network containing two empty subnets -
-az network vnet create \
---resource-group $resourceGroup \
---name $vnetName \
---address-prefixes $vnetIPAddress/20
+#Add an empty subnet for the master nodes
+az network vnet subnet create --name $masterSubnetName --resource-group $resourceGroup --vnet-name $vnetName \
+--address-prefixes $masterIPAddress --service-endpoints Microsoft.ContainerRegistry
 
-#Add an empty subnet for the master nodes -
-az network vnet subnet create \
---name  $workerSubnetName \
---resource-group $resourceGroup \
---vnet-name $vnetName \
---address-prefixes $workerIPAddress/21 \
---service-endpoints Microsoft.ContainerRegistry
+#Add an empty subnet for the worker nodes
+az network vnet subnet create --name  $workerSubnetName --resource-group $resourceGroup --vnet-name $vnetName \
+--address-prefixes $workerIPAddress --service-endpoints Microsoft.ContainerRegistry
 
-#Add an empty subnet for the worker nodes -
-az network vnet subnet create \
---name $masterSubnetName \
---resource-group $resourceGroup \
---vnet-name $vnetName \
---address-prefixes $masterIPAddress/24 \
---service-endpoints Microsoft.ContainerRegistry
-
-#Disable subnet private endpoint policies  -
-az network vnet subnet update \
---name $masterSubnetName \
---resource-group $resourceGroup \
---vnet-name $vnetName \
+#Disable subnet private endpoint policies
+az network vnet subnet update --name $masterSubnetName --resource-group $resourceGroup --vnet-name $vnetName \
 --disable-private-link-service-network-policies true
 
 #Create Service Principal for ARO cluster
 az ad sp create-for-rbac --role Contributor -n $servicePrincipalName
 #Note down the response
 {
-  "appId": "<client_id>",
-  "displayName": "<display_name>",
-  "name": "http://<display_name>",
-  "password": "<client_secret>",
-  "tenant": "<tenant_id>"
+  "appId": "",
+  "displayName": "https://aro-workshop-cluster-sp",
+  "name": "",
+  "password": "",
+  "tenant": ""
 }
 
-#Create the ARO Cluster (Public/Private) -
-az aro create \
-  --resource-group $resourceGroup \
-  --location $location \
-  --name $clusterName \
-  --vnet $vnetName \
-  --master-subnet $masterSubnetName \
-  --worker-subnet $workerSubnetName \
-  --apiserver-visibility $clusterType \
-  --ingress-visibility $clusterType \
-  --worker-count $workerCount \
-  --client-id "<client_id>" \
-  --client-secret "<client_secret>" \
-  --pull-secret @"/path/to/pull-secret.txt"
+spAppId=""
+spPassword=""
 
-#Delete a cluster
-az aro delete -n aro-workshop-cluster -g aro-workshop-rg -y
+#Create the ARO Cluster (Public/Private)
+#$pullSecret = Get-Content "$setupFolderPath/Security/pull-secret.txt" | out-string
+
+az aro create --resource-group $resourceGroup --vnet-resource-group $resourceGroup --location $location \
+  --name $clusterName --domain $domain --vnet $vnetName --master-subnet $masterSubnetName --worker-subnet $workerSubnetName \
+  --apiserver-visibility $clusterType --ingress-visibility $ingressType --worker-count $workerCount \
+  --client-id $spAppId --client-secret $spPassword --pull-secret @"$setupFolderPath/Security/pull-secret.txt"
 
 #ARO cluster details
 creds=$(az aro list-credentials -n $clusterName -g $resourceGroup)
-domain=$(az aro show -n $clusterName -g $resourceGroup --query clusterProfile.domain -o tsv)
-location=$(az aro show -n $clusterName -g $resourceGroup --query location -o tsv)
-apiServer=$(az aro show -n $clusterName -g $resourceGroup --query apiserverProfile.url -o tsv)
-webConsole=$(az aro show -n $clusterName -g $resourceGroup --query consoleProfile.url -o tsv)
-oauthCallbackURL=https://oauth-openshift.apps.$domain.$location.aroapp.io/oauth2callback/AAD
-
 echo $creds
+
+domain=$(az aro show -n $clusterName -g $resourceGroup --query clusterProfile.domain -o tsv)
+echo $domain
+
+location=$(az aro show -n $clusterName -g $resourceGroup --query location -o tsv)
+echo $location
+
+apiServer=$(az aro show -n $clusterName -g $resourceGroup --query apiserverProfile.url -o tsv)
+echo $apiServer
+
+webConsole=$(az aro show -n $clusterName -g $resourceGroup --query consoleProfile.url -o tsv)
+echo $webConsole
+
+oauthCallbackURL="https://oauth-openshift.apps.$domain.$location.aroapp.io/oauth2callback/AAD"
+echo $oauthCallbackURL
+
+az aro show -n $clusterName -g $resourceGroup --query '{api:apiserverProfile.ip, ingress:ingressProfiles[0].ip}'
+
+AAD
 {
-    "kubeadminusername": <user_name>,
-    "kubeadminpassword": <password>
+  client_id: ""
+  client_secret: ""
 
 }
 
@@ -214,7 +211,7 @@ helm uninstall nginx-ingress -n kube-system
 # Refer to Ingress folder in source repo
 oc apply -f "path/to/ingress_file_name"
 
-$projectName = "<place_holder>" (Sme as namespace in k8s)
+$projectName = "<place_holder>" (Same as namespace in k8s)
 #Create Projects/Namespaces - Dev, QA, Staging
 oc new-project $projectName
 # e.g. aro-workshop-dev
@@ -222,15 +219,17 @@ oc new-project $projectName
 #Deploy nginx server (for testing and health probe)
 oc new-app nginxinc/nginx-unprivileged
 
+oc create -n openshift -f https://raw.githubusercontent.com/openshift/origin/4ea9e6c5961eb815c200df933eee30c48a5c9166/examples/db-templates/mongodb-persistent-template.json
 oc process openshift//mongodb-persistent -p MONGODB_USER=ratingsuser -p MONGODB_PASSWORD=ratingspassword -p MONGODB_DATABASE=ratingsdb -p MONGODB_ADMIN_PASSWORD=ratingspassword | oc create -f -
 
-oc new-app https://github.com/monojit18/RatingsWebARO/ --context-dir=/RatingsWeb/Source
+oc new-app https://github.com/monojit18/mslearn-aks-workshop-ratings-web.git
 #Go to Deployments in Web Console
 #Select ratingswebaro deployment entry
 #Select Environments -> Add an entry
 API = http://ratingsapiaro.aro-workshop-dev.svc.cluster.local
 
-oc new-app https://github.com/monojit18/RatingsApiARO/ --context-dir=/RatingsApi/Source
+
+oc new-app https://github.com/monojit18/mslearn-aks-workshop-ratings-api.git
 #Go to Deployments
 #Select ratingsapiaro deployment entry
 #Select Environments -> Add an entry
@@ -245,6 +244,15 @@ oc expose svc/ratingswebaro
 #Hands-on-workshop
 https://aroworkshop.io/
 
+
+oc new-project ostoy
+
+
+Cleeanup
+=========
+#Delete a cluster
+az aro delete -n $clusterName -g $resourceGroup -y
+az network vnet delete -n $vnetName -g $resourceGroup
 
 
 
