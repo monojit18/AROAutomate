@@ -1,4 +1,5 @@
 !.gitignore
+**/.DS_Store
 **/aro-commands.txt
 **/Certs/**
 **/Misc/openshift-client-mac*
